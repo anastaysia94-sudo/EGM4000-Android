@@ -3,13 +3,9 @@ name: EGM4000 Fullstack Smoke
 on:
   push:
     branches: [ main ]
-    paths:
-      - "fullstack/**"
-      - ".github/workflows/fullstack-smoke.yml"
+    paths: ["fullstack/**", ".github/workflows/fullstack-smoke.yml"]
   pull_request:
-    paths:
-      - "fullstack/**"
-      - ".github/workflows/fullstack-smoke.yml"
+    paths: ["fullstack/**", ".github/workflows/fullstack-smoke.yml"]
   workflow_dispatch:
 
 jobs:
@@ -21,51 +17,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+        with: {python-version: "3.12"}
       - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - name: Syntax checks
+        with: {node-version: "22"}
+      - name: Install runtime dependency
+        run: pip install -r requirements.txt
+      - name: Assemble and syntax-check
+        env: {EGM_ASSEMBLE_ONLY: "1"}
         run: |
-          python -m py_compile bootstrap_db.py server.py live_intelligence.py
+          python -m py_compile bootstrap_db.py storage.py live_intelligence.py server.py
+          python server.py
           node --check static/app.js
       - name: Fresh database bootstrap
-        env:
-          EGM_OWNER_PASSWORD: ci-test-owner-password-not-for-production
+        env: {EGM_OWNER_PASSWORD: ci-test-owner-password-not-for-production}
         run: |
           rm -rf data
           python bootstrap_db.py --force
           python - <<'PY'
           import sqlite3
           c=sqlite3.connect('data/egm4000.db')
-          expected={
-            'users':238,
-            'gameplay_sessions':948,
-            'tips':948,
-            'admin_features':100,
-            'monetization_channels':25,
-            'return_features':49,
-            'checklist':161,
-          }
+          expected={'users':238,'gameplay_sessions':948,'tips':948,'forum_threads':237,'forum_replies':237,'blog_posts':237,'blog_comments':237,'surveys':2,'survey_questions':6,'admin_features':100,'monetization_channels':25,'return_features':49,'checklist':161}
           for table,n in expected.items():
               got=c.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0]
               assert got==n,(table,got,n)
-          print('seed counts verified')
+          print('full seed counts verified')
           PY
           test -f data/seed_users_credentials.generated.csv
-      - name: Server health smoke
-        env:
-          EGM_OWNER_PASSWORD: ci-test-owner-password-not-for-production
+      - name: Public API smoke
+        env: {EGM_OWNER_PASSWORD: ci-test-owner-password-not-for-production}
         run: |
           python server.py > /tmp/egm4000.log 2>&1 &
           pid=$!
           trap 'kill $pid || true' EXIT
-          for i in $(seq 1 20); do
-            if curl -fsS http://127.0.0.1:8040/api/health | grep -q 'egm.event.v1'; then
-              exit 0
-            fi
+          for i in $(seq 1 25); do
+            curl -fsS http://127.0.0.1:8040/api/health | grep -q 'egm.event.v1' && break
             sleep 1
           done
-          cat /tmp/egm4000.log
-          exit 1
+          curl -fsS http://127.0.0.1:8040/api/community/threads | grep -q 'Session Review'
+          curl -fsS http://127.0.0.1:8040/api/surveys/active | grep -q 'First Visit Pulse'

@@ -1,0 +1,52 @@
+        if path=='/api/live/replay':
+            s=self.need();
+            if not s:return
+            con=db();rows=con.execute('SELECT * FROM normalized_events WHERE user_id=? ORDER BY id DESC LIMIT 300',(s['id'],)).fetchall();con.close();return self.json(rowsdict(rows))
+        if path=='/api/live/context':
+            s=self.need();
+            if not s:return
+            con=db();out=context_pack(con,s['id']);con.close();return self.json(out)
+        if path=='/api/admin/dashboard':
+            s=self.need(owner=True);
+            if not s:return
+            con=db();counts={t:scalar(con,f'SELECT COUNT(*) FROM {t}') for t in ['users','forum_threads','forum_replies','blog_posts','blog_comments','reports','surveys','survey_responses','gameplay_sessions','tips','admin_features','monetization_channels','return_features']};recent=rowsdict(con.execute('SELECT * FROM reports ORDER BY id DESC LIMIT 30').fetchall());con.close();return self.json({'counts':counts,'reports':recent})
+        if path=='/api/admin/surveys':
+            s=self.need(owner=True);
+            if not s:return
+            con=db();rows=rowsdict(con.execute('SELECT * FROM surveys ORDER BY id DESC').fetchall());con.close();return self.json(rows)
+        if path=='/api/mobile/tips':
+            s=self.mobile();
+            if not s:return self.json({'error':'mobile_auth_required'},401)
+            con=db();rows=con.execute('SELECT t.*,g.platform FROM tips t LEFT JOIN gameplay_sessions g ON g.id=t.session_id WHERE t.user_id=? ORDER BY t.id DESC LIMIT 50',(s['id'],)).fetchall();con.close();return self.json(rowsdict(rows))
+        return self.serve(path)
+    def do_POST(self):
+        path=urlparse(self.path).path;b=self.body();ip,_=self.client_key()
+        if path=='/api/register':
+            if not rate(WRITE_BUCKET,'register:'+ip,5,3600):return self.json({'error':'rate_limited'},429)
+            username=re.sub(r'[^A-Za-z0-9_.-]','',clean(b.get('username'),32));email=clean(b.get('email'),160).lower();password=str(b.get('password',''));display=clean(b.get('display_name') or username,60)
+            if len(username)<3 or '@' not in email or len(password)<10:return self.json({'error':'invalid_registration'},400)
+            ph,salt=hash_password(password);con=db()
+            try:
+                uid=insert_id(con,'INSERT INTO users(username,email,password_hash,salt,role,display_name,bio,favorite_platform,skill_focus,joined_at,status,is_synthetic) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',(username,email,ph,salt,'user',display,'',clean(b.get('favorite_platform'),60),clean(b.get('skill_focus'),80),now(),'active',0));audit(con,uid,'user_registered','user',uid);con.commit()
+            except Exception:
+                con.rollback();con.close();return self.json({'error':'username_or_email_exists'},409)
+            con.close();return self.json({'ok':True,'user_id':uid},201)
+        if path=='/api/login':
+            if not rate(LOGIN_BUCKET,ip,12,900):return self.json({'error':'rate_limited'},429)
+            con=db();u=con.execute('SELECT * FROM users WHERE username=?',(clean(b.get('username'),60),)).fetchone();d=rowdict(u)
+            if not d or d['status']!='active' or not verify(str(b.get('password','')),d['password_hash'],d['salt']):con.close();return self.json({'error':'invalid_credentials'},401)
+            tok=secrets.token_urlsafe(32);csrf=secrets.token_urlsafe(24);exp=(datetime.now(timezone.utc)+timedelta(hours=12)).replace(microsecond=0).isoformat();con.execute('INSERT INTO auth_sessions(token,user_id,csrf,created_at,expires_at) VALUES(?,?,?,?,?)',(tok,d['id'],csrf,now(),exp));audit(con,d['id'],'login','user',d['id']);con.commit();con.close();cookie=f'egm_session={tok}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200'+('; Secure' if SECURE else '');return self.json({'ok':True},cookies=[cookie])
+        if path=='/api/logout':
+            s=self.session();
+            if s:
+                con=db();con.execute('DELETE FROM auth_sessions WHERE token=?',(s['token'],));con.commit();con.close()
+            return self.json({'ok':True},cookies=['egm_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax'+('; Secure' if SECURE else '')])
+        if path=='/api/community/thread':
+            s=self.need(csrf=True);
+            if not s:return
+            title=clean(b.get('title'),140);body=clean(b.get('body'),6000);category=clean(b.get('category') or 'General',60)
+            if len(title)<4 or len(body)<5:return self.json({'error':'content_too_short'},400)
+            con=db();tid=insert_id(con,'INSERT INTO forum_threads(user_id,title,body,category,status,pinned,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',(s['id'],title,body,category,'published',0,now(),now()));audit(con,s['id'],'forum_thread_created','forum_thread',tid);con.commit();con.close();return self.json({'ok':True,'id':tid},201)
+        if path=='/api/community/reply':
+            s=self.need(csrf=True);
+            if not s:return

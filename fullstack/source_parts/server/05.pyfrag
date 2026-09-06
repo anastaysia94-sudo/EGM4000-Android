@@ -1,0 +1,37 @@
+            rid=int(b.get('report_id',0));resolution=clean(b.get('resolution'),1000);con=db();con.execute("UPDATE reports SET status='resolved',resolution=?,resolved_at=? WHERE id=?",(resolution,now(),rid));audit(con,s['id'],'report_resolved','report',rid);con.commit();con.close();return self.json({'ok':True})
+        if path=='/api/admin/survey':
+            s=self.need(owner=True,csrf=True);
+            if not s:return
+            title=clean(b.get('title'),160);aud=clean(b.get('audience') or 'all',20);desc=clean(b.get('description'),1000);questions=b.get('questions') if isinstance(b.get('questions'),list) else []
+            if aud not in ('all','first','returning','registered') or not title:return self.json({'error':'invalid_survey'},400)
+            con=db();sid=insert_id(con,'INSERT INTO surveys(title,description,audience,status,frequency_days,starts_at,ends_at,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?)',(title,desc,aud,'active',int(b.get('frequency_days',30) or 30),None,None,s['id'],now()))
+            for pos,q in enumerate(questions[:20]):
+                prompt=clean(q.get('prompt'),400);kind=clean(q.get('kind') or 'text',20);opts=q.get('options') if isinstance(q.get('options'),list) else [];con.execute('INSERT INTO survey_questions(survey_id,prompt,kind,options_json,position,required) VALUES(?,?,?,?,?,?)',(sid,prompt,kind,json.dumps(opts),pos,1 if q.get('required',True) else 0))
+            audit(con,s['id'],'survey_created','survey',sid);con.commit();con.close();return self.json({'ok':True,'id':sid},201)
+        if path=='/api/live/start':
+            s=self.need(csrf=True);
+            if not s:return
+            con=db();sid=start_session(con,s['id'],clean(b.get('platform') or 'generic',60));con.close();return self.json({'ok':True,'session_id':sid})
+        if path=='/api/live/event':
+            s=self.need(csrf=True);
+            if not s:return
+            sid=int(b.get('session_id',0));evidence=clean(b.get('evidence_type') or 'observed_evidence',40);source='user-verified' if evidence=='observed_evidence' else 'vision-estimate';con=db()
+            try:eid=append_event(con,user_id=s['id'],session_id=sid,platform=clean(b.get('platform') or 'generic',60),event_type=clean(b.get('type') or 'annotation',80),source=source,evidence_type=evidence,confidence=float(b.get('confidence',1)),payload=b.get('payload') if isinstance(b.get('payload'),dict) else {});out=metrics(con,s['id'],sid);con.close();return self.json({'ok':True,'event_id':eid,'metrics':out})
+            except Exception as e:con.close();return self.json({'error':str(e)},400)
+        if path=='/api/mobile/login':
+            if not rate(LOGIN_BUCKET,'mobile:'+ip,12,900):return self.json({'error':'rate_limited'},429)
+            con=db();u=rowdict(con.execute('SELECT * FROM users WHERE username=?',(clean(b.get('username'),60),)).fetchone())
+            if not u or u['status']!='active' or not verify(str(b.get('password','')),u['password_hash'],u['salt']):con.close();return self.json({'error':'invalid_credentials'},401)
+            raw=secrets.token_urlsafe(40);exp=(datetime.now(timezone.utc)+timedelta(days=30)).replace(microsecond=0).isoformat();con.execute('INSERT INTO mobile_tokens(token_hash,user_id,created_at,expires_at,last_used_at) VALUES(?,?,?,?,?)',(token_hash(raw),u['id'],now(),exp,now()));audit(con,u['id'],'mobile_login','user',u['id']);con.commit();con.close();return self.json({'ok':True,'token':raw,'expires_at':exp,'user':{'id':u['id'],'display_name':u['display_name'],'role':u['role']}})
+        if path=='/api/mobile/sync':
+            s=self.mobile();
+            if not s:return self.json({'error':'mobile_auth_required'},401)
+            events=b.get('events') if isinstance(b.get('events'),list) else [];platform=clean(b.get('platform') or 'Fire Kirin',60);con=db();sid=start_session(con,s['id'],platform,'android_sync');accepted=0
+            for e in events[:1000]:
+                try:
+                    typ=clean(e.get('type') or 'annotation',80);prov=clean(e.get('provenance') or 'user_recorded',80);ev='observed_evidence' if prov=='user_recorded' else 'estimate';conf=float(e.get('confidence',1 if ev=='observed_evidence' else .55));payload={'creditDelta':e.get('creditDelta',0),'note':clean(e.get('note'),1000),'originalSchema':e.get('schema')};append_event(con,user_id=s['id'],session_id=sid,platform=platform,event_type=typ,source='android-'+prov,evidence_type=ev,confidence=conf,payload=payload,event_time=clean(e.get('time') or now(),80));accepted+=1
+                except Exception:pass
+            out=metrics(con,s['id'],sid);audit(con,s['id'],'android_sync','live_session',sid,{'accepted':accepted});con.commit();con.close();return self.json({'ok':True,'session_id':sid,'accepted':accepted,'metrics':out})
+        return self.json({'error':'not_found'},404)
+    def serve(self,path):
+        rel='index.html' if path=='/' else path.lstrip('/');fp=(STATIC/rel).resolve()

@@ -1,8 +1,5 @@
 data/egm4000.db
-data/server.secret
 data/seed_users_credentials.generated.csv
-OWNER_LOGIN.txt
+.env
 __pycache__/
 *.pyc
-.env
-.DS_Store

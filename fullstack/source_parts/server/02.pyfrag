@@ -1,0 +1,39 @@
+        raw=h[7:].strip();th=token_hash(raw);con=db();r=con.execute('SELECT m.token_hash,m.expires_at,u.* FROM mobile_tokens m JOIN users u ON u.id=m.user_id WHERE m.token_hash=?',(th,)).fetchone();d=rowdict(r)
+        if d and d['expires_at']>now() and d['status']=='active':con.execute('UPDATE mobile_tokens SET last_used_at=? WHERE token_hash=?',(now(),th));con.commit();con.close();return d
+        con.close();return None
+    def need(self,owner=False,csrf=False):
+        s=self.session()
+        if not s:self.json({'error':'authentication_required'},401);return None
+        if owner and s['role']!='owner':self.json({'error':'owner_only'},403);return None
+        if csrf and self.headers.get('X-CSRF-Token')!=s['csrf']:self.json({'error':'csrf_failed'},403);return None
+        return s
+    def do_OPTIONS(self):
+        self.send_response(204);self.send_common();self.send_header('Access-Control-Allow-Headers','Content-Type,Authorization,X-CSRF-Token');self.send_header('Access-Control-Allow-Methods','GET,POST,OPTIONS');self.end_headers()
+    def do_GET(self):
+        p=urlparse(self.path);path=p.path;q=parse_qs(p.query)
+        if path=='/api/health':
+            con=db();counts={t:scalar(con,f'SELECT COUNT(*) FROM {t}') for t in ['users','forum_threads','blog_posts','surveys']};con.close();return self.json({'ok':True,'service':'EGM4000 public fullstack','schema':'egm.event.v1','counts':counts})
+        if path=='/api/adapters':return self.json(list(ADAPTERS))
+        if path=='/api/me':
+            s=self.session();return self.json({'authenticated':False} if not s else {'authenticated':True,'user':{k:s[k] for k in ['id','username','display_name','role','favorite_platform','skill_focus']},'csrf':s['csrf']})
+        if path=='/api/summary':
+            s=self.need();
+            if not s:return
+            con=db();out={'gameplay_sessions':scalar(con,'SELECT COUNT(*) FROM gameplay_sessions WHERE user_id=?',(s['id'],)),'tips':scalar(con,'SELECT COUNT(*) FROM tips WHERE user_id=?',(s['id'],)),'threads':scalar(con,'SELECT COUNT(*) FROM forum_threads WHERE user_id=?',(s['id'],)),'posts':scalar(con,'SELECT COUNT(*) FROM blog_posts WHERE user_id=?',(s['id'],))};con.close();return self.json(out)
+        if path=='/api/tips':
+            s=self.need();
+            if not s:return
+            con=db();rows=con.execute('SELECT t.*,g.platform,g.started_at FROM tips t LEFT JOIN gameplay_sessions g ON g.id=t.session_id WHERE t.user_id=? ORDER BY t.id DESC LIMIT 100',(s['id'],)).fetchall();con.close();return self.json(rowsdict(rows))
+        if path=='/api/community/threads':
+            con=db();rows=con.execute("SELECT f.*,u.display_name,(SELECT COUNT(*) FROM forum_replies r WHERE r.thread_id=f.id AND r.status='published') reply_count FROM forum_threads f JOIN users u ON u.id=f.user_id WHERE f.status='published' ORDER BY f.pinned DESC,f.id DESC LIMIT 100").fetchall();con.close();return self.json(rowsdict(rows))
+        if path=='/api/community/thread':
+            tid=int(qval(q,'id','0') or 0);con=db();t=con.execute("SELECT f.*,u.display_name FROM forum_threads f JOIN users u ON u.id=f.user_id WHERE f.id=? AND f.status='published'",(tid,)).fetchone();rows=con.execute("SELECT r.*,u.display_name FROM forum_replies r JOIN users u ON u.id=r.user_id WHERE r.thread_id=? AND r.status='published' ORDER BY r.id",(tid,)).fetchall();con.close();return self.json({'thread':rowdict(t),'replies':rowsdict(rows)})
+        if path=='/api/blog/posts':
+            con=db();rows=con.execute("SELECT b.*,u.display_name,(SELECT COUNT(*) FROM blog_comments c WHERE c.post_id=b.id AND c.status='published') comment_count FROM blog_posts b JOIN users u ON u.id=b.user_id WHERE b.status='published' ORDER BY b.id DESC LIMIT 100").fetchall();con.close();return self.json(rowsdict(rows))
+        if path=='/api/blog/post':
+            pid=int(qval(q,'id','0') or 0);con=db();post=con.execute("SELECT b.*,u.display_name FROM blog_posts b JOIN users u ON u.id=b.user_id WHERE b.id=? AND b.status='published'",(pid,)).fetchone();comments=con.execute("SELECT c.*,u.display_name FROM blog_comments c JOIN users u ON u.id=c.user_id WHERE c.post_id=? AND c.status='published' ORDER BY c.id",(pid,)).fetchall();con.close();return self.json({'post':rowdict(post),'comments':rowsdict(comments)})
+        if path=='/api/surveys/active':
+            v=self.visitor(touch=True);s=self.session();aud='registered' if s else ('first' if v['visits']<=1 else 'returning');con=db();rows=con.execute("SELECT * FROM surveys WHERE status='active' AND audience IN ('all',?) ORDER BY id",(aud,)).fetchall();out=[]
+            for r in rows:
+                d=rowdict(r);qs=con.execute('SELECT * FROM survey_questions WHERE survey_id=? ORDER BY position,id',(d['id'],)).fetchall();d['questions']=rowsdict(qs);out.append(d)
+            con.commit();con.close();return self.json({'audience':aud,'consent':bool(v['consent']),'surveys':out},cookies=[v['cookie']] if v['cookie'] else None)

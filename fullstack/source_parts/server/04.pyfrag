@@ -1,0 +1,43 @@
+            tid=int(b.get('thread_id',0));body=clean(b.get('body'),5000)
+            if not tid or len(body)<2:return self.json({'error':'invalid_reply'},400)
+            con=db();rid=insert_id(con,'INSERT INTO forum_replies(thread_id,user_id,body,status,created_at) VALUES(?,?,?,?,?)',(tid,s['id'],body,'published',now()));audit(con,s['id'],'forum_reply_created','forum_reply',rid);con.commit();con.close();return self.json({'ok':True,'id':rid},201)
+        if path=='/api/blog/post':
+            s=self.need(csrf=True);
+            if not s:return
+            title=clean(b.get('title'),160);body=clean(b.get('body'),12000);tags=clean(b.get('tags'),300);status='published' if s['role']=='owner' else 'pending'
+            if len(title)<4 or len(body)<20:return self.json({'error':'content_too_short'},400)
+            con=db();pid=insert_id(con,'INSERT INTO blog_posts(user_id,title,body,tags,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)',(s['id'],title,body,tags,status,now(),now()));audit(con,s['id'],'blog_post_submitted','blog_post',pid,{'status':status});con.commit();con.close();return self.json({'ok':True,'id':pid,'status':status},201)
+        if path=='/api/blog/comment':
+            s=self.need(csrf=True);
+            if not s:return
+            pid=int(b.get('post_id',0));body=clean(b.get('body'),4000)
+            if not pid or len(body)<2:return self.json({'error':'invalid_comment'},400)
+            con=db();cid=insert_id(con,'INSERT INTO blog_comments(post_id,user_id,body,status,created_at) VALUES(?,?,?,?,?)',(pid,s['id'],body,'published',now()));audit(con,s['id'],'blog_comment_created','blog_comment',cid);con.commit();con.close();return self.json({'ok':True,'id':cid},201)
+        if path=='/api/report':
+            s=self.need(csrf=True);
+            if not s:return
+            tt=clean(b.get('target_type'),30);tid=int(b.get('target_id',0));reason=clean(b.get('reason'),1000)
+            if tt not in ('forum_thread','forum_reply','blog_post','blog_comment') or not tid:return self.json({'error':'invalid_report'},400)
+            con=db();rid=insert_id(con,'INSERT INTO reports(reporter_user_id,target_type,target_id,reason,status,resolution,created_at,resolved_at) VALUES(?,?,?,?,?,?,?,?)',(s['id'],tt,tid,reason or 'User report','open','',now(),None));audit(con,s['id'],'content_reported','report',rid);con.commit();con.close();return self.json({'ok':True,'id':rid},201)
+        if path=='/api/survey/consent':
+            v=self.visitor(touch=False,consent=bool(b.get('consent')));return self.json({'ok':True,'consent':bool(v['consent'])},cookies=[v['cookie']] if v['cookie'] else None)
+        if path=='/api/survey/respond':
+            if not rate(WRITE_BUCKET,'survey:'+ip,30,3600):return self.json({'error':'rate_limited'},429)
+            v=self.visitor(touch=False);s=self.session();sid=int(b.get('survey_id',0));answers=b.get('answers') if isinstance(b.get('answers'),dict) else {}
+            if not v['consent']:return self.json({'error':'survey_consent_required'},403,cookies=[v['cookie']] if v['cookie'] else None)
+            con=db();survey=rowdict(con.execute("SELECT * FROM surveys WHERE id=? AND status='active'",(sid,)).fetchone())
+            if not survey:con.close();return self.json({'error':'survey_not_found'},404)
+            rid=insert_id(con,'INSERT INTO survey_responses(survey_id,user_id,visitor_hash,created_at) VALUES(?,?,?,?)',(sid,s['id'] if s else None,v['hash'],now()));
+            qs=con.execute('SELECT id FROM survey_questions WHERE survey_id=?',(sid,)).fetchall();valid={str(rowdict(x)['id']) for x in qs}
+            for k,val in answers.items():
+                if str(k) in valid:con.execute('INSERT INTO survey_answers(response_id,question_id,answer_text) VALUES(?,?,?)',(rid,int(k),clean(val,2000)))
+            con.commit();con.close();return self.json({'ok':True,'response_id':rid},201,cookies=[v['cookie']] if v['cookie'] else None)
+        if path=='/api/admin/moderate':
+            s=self.need(owner=True,csrf=True);
+            if not s:return
+            tt=clean(b.get('target_type'),30);tid=int(b.get('target_id',0));action=clean(b.get('action'),30);allowed={'forum_thread':'forum_threads','forum_reply':'forum_replies','blog_post':'blog_posts','blog_comment':'blog_comments'}
+            if tt not in allowed or action not in ('hide','restore','publish','remove'):return self.json({'error':'invalid_moderation_action'},400)
+            status='published' if action in ('restore','publish') else 'hidden';con=db();con.execute(f'UPDATE {allowed[tt]} SET status=? WHERE id=?',(status,tid));audit(con,s['id'],'moderation_'+action,tt,tid);con.commit();con.close();return self.json({'ok':True,'status':status})
+        if path=='/api/admin/resolve-report':
+            s=self.need(owner=True,csrf=True);
+            if not s:return
