@@ -35,7 +35,7 @@ public final class ApiClient {
         conn.setConnectTimeout(12000);
         conn.setReadTimeout(20000);
         conn.setRequestProperty("Accept", "application/json");
-        conn.setRequestProperty("User-Agent", "EGM4000-Android/0.2");
+        conn.setRequestProperty("User-Agent", "EGM4000-Android/0.2.1");
         if (bearerToken != null && !bearerToken.isEmpty()) conn.setRequestProperty("Authorization", "Bearer " + bearerToken);
         if (body != null) {
             conn.setDoOutput(true);
