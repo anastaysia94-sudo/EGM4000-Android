@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>EGM4000 — EduGameMaster 4000</title>
+  <meta name="theme-color" content="#060B14">
+  <link rel="manifest" href="manifest.webmanifest">
+  <style>
+    :root{--bg:#060B14;--panel:#0B1624;--line:#17334a;--cyan:#00F2FF;--teal:#00D4C8;--violet:#7A28FF;--text:#E9FBFF;--muted:#9DB7C4;--warn:#FFB84A;--bad:#FF5C57;--good:#38FFC6}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 70% 0%,rgba(0,242,255,.16),transparent 34%),linear-gradient(145deg,#02050b,#071626 60%,#050914);color:var(--text);font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif}header{padding:28px 18px;border-bottom:1px solid var(--line);background:rgba(5,9,20,.78);position:sticky;top:0;backdrop-filter:blur(10px)}h1{margin:0;color:var(--cyan);font-size:clamp(30px,7vw,62px);letter-spacing:.04em}h2{color:var(--teal)}main{max-width:1180px;margin:auto;padding:22px;display:grid;gap:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}.card{border:1px solid var(--line);background:linear-gradient(180deg,rgba(11,22,36,.96),rgba(5,12,24,.94));border-radius:20px;padding:18px;box-shadow:0 0 42px rgba(0,242,255,.08)}button,a.btn{background:linear-gradient(135deg,var(--cyan),var(--violet));color:#031018;border:0;border-radius:14px;padding:12px 14px;font-weight:800;text-decoration:none;display:inline-block;margin:4px 4px 4px 0;cursor:pointer}input,textarea{width:100%;background:#07111f;border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;margin:6px 0}small,.muted{color:var(--muted)}.warning{border-left:4px solid var(--warn)}.danger{border-left:4px solid var(--bad)}.good{border-left:4px solid var(--good)}.event{white-space:pre-wrap;font-family:ui-monospace,Consolas,monospace;font-size:13px}.pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:6px 10px;margin:4px;color:var(--muted)}</style>
+</head>
+<body>
+<header>
+  <div class="pill">SmartPickShop Holdings</div><div class="pill">PUBLIC BETA</div><div class="pill">Local-first</div>
+  <h1>EGM4000</h1>
+  <p>EduGameMaster 4000 · Watch. Measure. Explain. Improve.</p>
+</header>
+<main>
+  <section class="card warning"><h2>Safety boundary</h2><p>EGM4000 analyzes user-authorized session evidence. It does not guarantee profit, predict random outcomes, read hidden Fire Kirin server state, store your Fire Kirin password, manipulate balances, bypass protections, or cheat live services.</p></section>
+  <section class="grid">
+    <div class="card"><h2>Fire Kirin companion</h2><input id="portal" value="https://firekirin.com" aria-label="Fire Kirin portal URL"><a class="btn" id="openFire" target="_blank" rel="noopener">Open Fire Kirin securely</a><p class="muted">Sign in directly with Fire Kirin. Return here to log and review your own session.</p></div>
+    <div class="card"><h2>Live session logger</h2><input id="note" placeholder="Event note"><button onclick="addEvent('shot',1)">Shot +1</button><button onclick="addEvent('credit_up',10)">Credit +</button><button onclick="addEvent('credit_down',-10)">Credit -</button><button onclick="addEvent('break',0)">Break</button><button onclick="clearEvents()">Clear local test data</button></div>
+    <div class="card"><h2>Authorized capture</h2><button onclick="requestCapture()">Start browser screen feedback</button><p id="captureState" class="muted">No capture active. Browser permission is required; raw frames are not saved.</p></div>
+  </section>
+  <section class="grid">
+    <div class="card good"><h2>Metrics</h2><div id="metrics"></div></div>
+    <div class="card"><h2>Evidence-based tips</h2><div id="tips"></div></div>
+    <div class="card"><h2>Replay</h2><div id="events"></div></div>
+  </section>
+  <section class="card"><h2>Export / import</h2><button onclick="exportJson()">Export JSON</button><textarea id="importBox" rows="5" placeholder="Paste exported JSON here"></textarea><button onclick="importJson()">Import JSON</button></section>
+</main>
+<script>
+const KEY='egm4000.web.events.v1';
+function events(){try{return JSON.parse(localStorage.getItem(KEY)||'[]')}catch{return[]}}
+function save(v){localStorage.setItem(KEY,JSON.stringify(v));render()}
+function addEvent(type,delta){const arr=events();arr.push({schema:'egm4000.gameplay-event.v1',platform:'Fire Kirin',type,creditDelta:delta,note:document.getElementById('note').value||'',provenance:'user_recorded',confidence:1,time:new Date().toISOString()});save(arr)}
+function clearEvents(){save([])}
+function render(){const arr=events();let shots=arr.filter(e=>e.type==='shot').length;let net=arr.reduce((s,e)=>s+(e.creditDelta||0),0);metrics.innerHTML=`<p><b>${arr.length}</b> events</p><p><b>${shots}</b> shots</p><p><b>${net}</b> net credit movement</p>`;tips.innerHTML=arr.length?`<p>${net<0?'Slow down and review before continuing.':''} If pace rises while net credits fall, treat it as a review signal, not a prediction.</p>`:'<p class="muted">Record events to unlock feedback.</p>';document.getElementById('events').innerHTML=arr.slice().reverse().map(e=>`<div class="event card">${e.time}\n${e.type} · ${e.creditDelta} credits\nEvidence: ${e.provenance} · confidence ${e.confidence}\n${e.note}</div>`).join('')||'<p class="muted">No replay evidence yet.</p>';document.getElementById('openFire').href=document.getElementById('portal').value}
+async function requestCapture(){try{const s=await navigator.mediaDevices.getDisplayMedia({video:true,audio:false});captureState.textContent='Authorized browser screen feedback active. Raw frames are not stored.';s.getTracks().forEach(t=>t.onended=()=>captureState.textContent='Capture stopped.')}catch(e){captureState.textContent='Capture not authorized or unavailable: '+e.message}}
+function exportJson(){const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),events:events()},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='egm4000-session-export.json';a.click();URL.revokeObjectURL(a.href)}
+function importJson(){try{const obj=JSON.parse(importBox.value);save(Array.isArray(obj)?obj:(obj.events||[]))}catch(e){alert('Import failed: '+e.message)}}
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});portal.addEventListener('input',render);render();
+</script>
+</body>
+</html>
