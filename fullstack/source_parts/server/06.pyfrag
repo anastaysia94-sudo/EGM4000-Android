@@ -9,11 +9,38 @@ try:sync_admin_registry(_admin)
 finally:_admin.close()
 _original_do_GET=App.do_GET
 def _admin_registry_do_GET(self):
-    path=urlparse(self.path).path
+    parsed=urlparse(self.path);path=parsed.path;q=parse_qs(parsed.query)
     if path=='/api/admin/features':
         s=self.need(owner=True)
         if not s:return
         con=db();rows=rowsdict(con.execute('SELECT * FROM admin_features ORDER BY id').fetchall());out=registry_payload(rows);con.close();return self.json(out)
+    if path=='/api/admin/users':
+        s=self.need(owner=True)
+        if not s:return
+        term=clean(qval(q,'q',''),80);status=clean(qval(q,'status',''),20);synthetic=clean(qval(q,'synthetic',''),10);limit=max(1,min(200,int(qval(q,'limit','50') or 50)))
+        where=[];args=[]
+        if term:
+            like='%'+term.lower()+'%';where.append('(LOWER(username) LIKE ? OR LOWER(display_name) LIKE ? OR LOWER(email) LIKE ?)');args.extend([like,like,like])
+        if status in ('active','inactive','suspended'):where.append('status=?');args.append(status)
+        if synthetic in ('0','1'):where.append('is_synthetic=?');args.append(int(synthetic))
+        clause=(' WHERE '+' AND '.join(where)) if where else ''
+        con=db();rows=rowsdict(con.execute('SELECT id,username,email,role,display_name,favorite_platform,skill_focus,joined_at,status,is_synthetic FROM users'+clause+' ORDER BY id DESC LIMIT ?',tuple(args+[limit])).fetchall());con.close();return self.json({'count':len(rows),'users':rows})
+    if path=='/api/admin/user':
+        s=self.need(owner=True)
+        if not s:return
+        uid=int(qval(q,'id','0') or 0);con=db();u=rowdict(con.execute('SELECT id,username,email,role,display_name,bio,favorite_platform,skill_focus,joined_at,status,is_synthetic FROM users WHERE id=?',(uid,)).fetchone())
+        if not u:con.close();return self.json({'error':'user_not_found'},404)
+        counts={'gameplay_sessions':scalar(con,'SELECT COUNT(*) FROM gameplay_sessions WHERE user_id=?',(uid,)),'live_sessions':scalar(con,'SELECT COUNT(*) FROM live_sessions WHERE user_id=?',(uid,)),'tips':scalar(con,'SELECT COUNT(*) FROM tips WHERE user_id=?',(uid,)),'threads':scalar(con,'SELECT COUNT(*) FROM forum_threads WHERE user_id=?',(uid,)),'posts':scalar(con,'SELECT COUNT(*) FROM blog_posts WHERE user_id=?',(uid,)),'experiments':scalar(con,'SELECT COUNT(*) FROM coaching_experiments WHERE user_id=?',(uid,))}
+        sessions=rowsdict(con.execute('SELECT id,platform,started_at,duration_min,shots,hits,source FROM gameplay_sessions WHERE user_id=? ORDER BY id DESC LIMIT 12',(uid,)).fetchall());live=rowsdict(con.execute('SELECT id,platform,started_at,ended_at,status,source FROM live_sessions WHERE user_id=? ORDER BY id DESC LIMIT 12',(uid,)).fetchall());tips=rowsdict(con.execute('SELECT id,created_at,title,confidence,evidence_type,sample_size,live_session_id,session_id FROM tips WHERE user_id=? ORDER BY id DESC LIMIT 12',(uid,)).fetchall());experiments=list_experiments(con,uid,12);con.close();return self.json({'user':u,'counts':counts,'gameplay_sessions':sessions,'live_sessions':live,'tips':tips,'experiments':experiments})
+    if path=='/api/admin/reports':
+        s=self.need(owner=True)
+        if not s:return
+        status=clean(qval(q,'status','open'),20);target=clean(qval(q,'target_type',''),30);limit=max(1,min(200,int(qval(q,'limit','50') or 50)));where=[];args=[]
+        if status in ('open','resolved'):where.append('status=?');args.append(status)
+        elif status!='all':where.append('status=?');args.append('open')
+        if target in ('forum_thread','forum_reply','blog_post','blog_comment'):where.append('target_type=?');args.append(target)
+        clause=(' WHERE '+' AND '.join(where)) if where else ''
+        con=db();rows=rowsdict(con.execute('SELECT * FROM reports'+clause+' ORDER BY id DESC LIMIT ?',tuple(args+[limit])).fetchall());con.close();return self.json({'count':len(rows),'reports':rows,'filters':{'status':status,'target_type':target}})
     return _original_do_GET(self)
 App.do_GET=_admin_registry_do_GET
 
