@@ -18,7 +18,7 @@
 <main>
   <section class="card warning"><h2>Safety boundary</h2><p>EGM4000 analyzes user-authorized session evidence. It does not guarantee profit, predict random outcomes, read hidden Fire Kirin server state, store your Fire Kirin password, manipulate balances, bypass protections, or cheat live services.</p></section>
   <section class="grid">
-    <div class="card"><h2>Fire Kirin companion</h2><input id="portal" value="https://firekirin.com" aria-label="Fire Kirin portal URL"><a class="btn" id="openFire" target="_blank" rel="noopener">Open Fire Kirin securely</a><p class="muted">Sign in directly with Fire Kirin. Return here to log and review your own session.</p></div>
+    <div class="card"><h2>Fire Kirin companion</h2><input id="portal" value="https://play.firekirin.xyz/web_game/firekirin777_pc/index.html" aria-label="Fire Kirin portal URL"><a class="btn" id="openFire" target="_blank" rel="noopener">Open Fire Kirin securely</a><button onclick="resetPortal()">Reset configured login</button><p class="muted">Configured Fire Kirin login: https://play.firekirin.xyz/web_game/firekirin777_pc/index.html</p><p class="muted">Sign in directly with Fire Kirin. Return here to log and review your own session. EGM4000 never asks for or stores the password.</p></div>
     <div class="card"><h2>Live session logger</h2><input id="note" placeholder="Event note"><button onclick="addEvent('shot',1)">Shot +1</button><button onclick="addEvent('credit_up',10)">Credit +</button><button onclick="addEvent('credit_down',-10)">Credit -</button><button onclick="addEvent('break',0)">Break</button><button onclick="clearEvents()">Clear local test data</button></div>
     <div class="card"><h2>Authorized capture</h2><button onclick="requestCapture()">Start browser screen feedback</button><p id="captureState" class="muted">No capture active. Browser permission is required; raw frames are not saved.</p></div>
   </section>
@@ -31,8 +31,10 @@
 </main>
 <script>
 const KEY='egm4000.web.events.v1';
+const DEFAULT_FIRE_KIRIN_URL='https://play.firekirin.xyz/web_game/firekirin777_pc/index.html';
 function events(){try{return JSON.parse(localStorage.getItem(KEY)||'[]')}catch{return[]}}
 function save(v){localStorage.setItem(KEY,JSON.stringify(v));render()}
+function resetPortal(){document.getElementById('portal').value=DEFAULT_FIRE_KIRIN_URL;render()}
 function addEvent(type,delta){const arr=events();arr.push({schema:'egm4000.gameplay-event.v1',platform:'Fire Kirin',type,creditDelta:delta,note:document.getElementById('note').value||'',provenance:'user_recorded',confidence:1,time:new Date().toISOString()});save(arr)}
 function clearEvents(){save([])}
 function render(){const arr=events();let shots=arr.filter(e=>e.type==='shot').length;let net=arr.reduce((s,e)=>s+(e.creditDelta||0),0);metrics.innerHTML=`<p><b>${arr.length}</b> events</p><p><b>${shots}</b> shots</p><p><b>${net}</b> net credit movement</p>`;tips.innerHTML=arr.length?`<p>${net<0?'Slow down and review before continuing.':''} If pace rises while net credits fall, treat it as a review signal, not a prediction.</p>`:'<p class="muted">Record events to unlock feedback.</p>';document.getElementById('events').innerHTML=arr.slice().reverse().map(e=>`<div class="event card">${e.time}\n${e.type} · ${e.creditDelta} credits\nEvidence: ${e.provenance} · confidence ${e.confidence}\n${e.note}</div>`).join('')||'<p class="muted">No replay evidence yet.</p>';document.getElementById('openFire').href=document.getElementById('portal').value}
