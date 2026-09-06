@@ -1,0 +1,51 @@
+name: Build EGM4000 Fire Kirin APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - "EGM4000-Android-SV09-Fire-Kirin-Companion-source.zip"
+      - ".github/workflows/build-egm4000-apk.yml"
+
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Verify source ZIP exists
+        run: test -f EGM4000-Android-SV09-Fire-Kirin-Companion-source.zip
+      - name: Extract EGM4000 Android source
+        run: |
+          rm -rf buildsrc
+          mkdir -p buildsrc
+          unzip -q EGM4000-Android-SV09-Fire-Kirin-Companion-source.zip -d buildsrc
+          test -f buildsrc/android-egm4000/app/build.gradle.kts
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android 36 SDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+      - name: Run unit tests
+        working-directory: buildsrc/android-egm4000
+        run: gradle :app:testDebugUnitTest --stacktrace
+      - name: Build installable debug APK
+        working-directory: buildsrc/android-egm4000
+        run: gradle :app:assembleDebug --stacktrace
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EGM4000-Fire-Kirin-Companion-debug-apk
+          path: buildsrc/android-egm4000/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
