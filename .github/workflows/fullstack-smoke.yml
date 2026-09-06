@@ -48,9 +48,9 @@ jobs:
           assert len(ADMIN_CAPABILITIES)==100
           assert all(not title.startswith('Admin capability ') for _,title,_,_ in rows)
           statuses={s:sum(1 for r in rows if r[3]==s) for s in {'implemented','modelled','provider_configuration_required'}}
-          assert statuses=={'implemented':42,'modelled':33,'provider_configuration_required':25},statuses
+          assert statuses=={'implemented':47,'modelled':28,'provider_configuration_required':25},statuses
           assert len({r[2] for r in rows})==9
-          for fid in ('A015','A021','A022','A053','A057'):
+          for fid in ('A015','A021','A022','A023','A024','A025','A026','A029','A053','A057'):
               assert c.execute('SELECT done FROM checklist WHERE id=?',(fid,)).fetchone()[0]==1,fid
           assert c.execute("SELECT done FROM checklist WHERE id='A071'").fetchone()[0]==0
           print('full seed + C007 Admin 100 registry verified',statuses)
@@ -69,7 +69,7 @@ jobs:
           curl -fsS http://127.0.0.1:8040/api/community/threads | grep -q 'Session Review'
           curl -fsS http://127.0.0.1:8040/api/surveys/active | grep -q 'First Visit Pulse'
           curl -fsS -c /tmp/egm.cookies -H 'Content-Type: application/json' -d '{"username":"EGM4000Owner","password":"ci-test-owner-password-not-for-production"}' http://127.0.0.1:8040/api/login | grep -q '"ok": true'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/features | grep -q 'User search and filters'
+          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/features | grep -q 'Thread moderation'
           curl -fsS -b /tmp/egm.cookies 'http://127.0.0.1:8040/api/admin/users?q=AquaPilot001&synthetic=1' | grep -q 'AquaPilot001'
           curl -fsS -b /tmp/egm.cookies 'http://127.0.0.1:8040/api/admin/user?id=2' | grep -q 'gameplay_sessions'
           curl -fsS -b /tmp/egm.cookies 'http://127.0.0.1:8040/api/admin/reports?status=open&target_type=forum_thread' | grep -q '"reports"'
