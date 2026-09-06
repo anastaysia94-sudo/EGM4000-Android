@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://smartpickshop.local/schemas/egm4000.gameplay-event.v1.schema.json",
+  "title": "EGM4000 Normalized Gameplay Event v1",
+  "type": "object",
+  "required": ["schema", "platform", "type", "time", "provenance", "confidence"],
+  "properties": {
+    "schema": { "const": "egm4000.gameplay-event.v1" },
+    "platform": { "type": "string" },
+    "type": { "type": "string", "examples": ["shot", "credit_up", "credit_down", "break", "screen_feedback_started"] },
+    "time": { "type": "string" },
+    "creditDelta": { "type": "number" },
+    "note": { "type": "string" },
+    "provenance": { "type": "string", "examples": ["exact_telemetry", "user_recorded", "user_authorized_device_signal", "estimate", "hypothesis"] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+  },
+  "additionalProperties": true
+}
