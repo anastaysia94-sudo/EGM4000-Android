@@ -117,7 +117,8 @@ def _ensure_experiment(con,user_id,tip_id,session_id,a,c):
     if not rule:return None
     value=_metric_value(a,target);q=a.get('quality',{});row=rowdict(con.execute('SELECT * FROM coaching_experiments WHERE user_id=? AND tip_id=?',(user_id,tip_id)).fetchone())
     if row:
-        if not row.get('followup_live_session_id'):con.execute('UPDATE coaching_experiments SET baseline_value=?,baseline_sample_size=?,confidence=?,updated_at=? WHERE id=?',(value,int(q.get('sampleSize',0)),float(q.get('confidence',0)),now_iso(),row['id']))
+        if not row.get('followup_live_session_id'):
+            con.execute('UPDATE coaching_experiments SET platform=?,target_metric=?,direction=?,baseline_value=?,baseline_sample_size=?,confidence=?,updated_at=? WHERE id=?',(a.get('platform') or 'generic',target,rule['direction'],value,int(q.get('sampleSize',0)),float(q.get('confidence',0)),now_iso(),row['id']))
         return row['id']
     return _insert_id(con,'INSERT INTO coaching_experiments(user_id,tip_id,baseline_live_session_id,platform,target_metric,direction,status,baseline_value,result,baseline_sample_size,confidence,uncertainty,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(user_id,tip_id,session_id,a.get('platform') or 'generic',target,rule['direction'],'waiting_followup',value,'insufficient_evidence',int(q.get('sampleSize',0)),float(q.get('confidence',0)),'Waiting for a later comparable session with sufficient evidence.',now_iso(),now_iso()))
 def refresh_live_tip(con,user_id:int,session_id:int):
