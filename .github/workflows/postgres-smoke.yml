@@ -1,0 +1,113 @@
+name: EGM4000 PostgreSQL / Supabase Compatibility Smoke
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/postgres-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: egm4000_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d egm4000_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/egm4000_ci
+      EGM_OWNER_PASSWORD: CI-only-owner-password-not-for-production
+      EGM_SECURE_COOKIES: "0"
+      PORT: "8040"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install production database dependency
+        run: pip install -r fullstack/requirements.txt
+
+      - name: Bootstrap EGM4000 on PostgreSQL
+        working-directory: fullstack
+        run: python bootstrap_db.py
+
+      - name: Verify seeded counts and post-seed SERIAL inserts
+        working-directory: fullstack
+        run: |
+          python - <<'PY'
+          from datetime import datetime, timezone
+          from storage import connect, insert_id, scalar
+          from bootstrap_db import hash_password
+
+          now=datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+          con=connect()
+          assert scalar(con,'SELECT COUNT(*) FROM users') == 238
+          assert scalar(con,'SELECT COUNT(*) FROM forum_threads') == 237
+          assert scalar(con,'SELECT COUNT(*) FROM blog_posts') == 237
+          assert scalar(con,'SELECT COUNT(*) FROM surveys') == 2
+
+          ph,salt=hash_password('PostgresSmokePass!123')
+          uid=insert_id(con,'INSERT INTO users(username,email,password_hash,salt,role,display_name,bio,favorite_platform,skill_focus,joined_at,status,is_synthetic) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',('PostgresSmoke','postgres-smoke@example.test',ph,salt,'user','Postgres Smoke','','Fire Kirin','database verification',now,'active',0))
+          assert uid > 238, uid
+
+          tid=insert_id(con,'INSERT INTO forum_threads(user_id,title,body,category,status,pinned,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',(uid,'PostgreSQL sequence smoke','Real insert after deterministic seed ids.','QA','published',0,now,now))
+          assert tid > 237, tid
+
+          bid=insert_id(con,'INSERT INTO blog_posts(user_id,title,body,tags,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)',(uid,'PostgreSQL blog sequence smoke','Verifies public blog inserts cannot collide with seeded ids.','qa,postgres','published',now,now))
+          assert bid > 237, bid
+
+          sid=insert_id(con,'INSERT INTO surveys(title,description,audience,status,frequency_days,starts_at,ends_at,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?)',('PostgreSQL survey sequence smoke','Sequence verification only.','all','inactive',30,None,None,1,now))
+          assert sid > 2, sid
+          con.commit();con.close()
+          print('PostgreSQL seed + SERIAL sequence compatibility PASS', {'user_id':uid,'thread_id':tid,'blog_id':bid,'survey_id':sid})
+          PY
+
+      - name: Start full EGM4000 server on PostgreSQL
+        working-directory: fullstack
+        run: |
+          nohup python server.py >/tmp/egm-postgres.log 2>&1 &
+          echo $! >/tmp/egm-postgres.pid
+
+      - name: Verify public health contract on PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8040/api/health > /tmp/health.json; then
+              break
+            fi
+            sleep 2
+          done
+          cat /tmp/health.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/health.json'))
+          assert d.get('ok') is True, d
+          assert d.get('schema') == 'egm.event.v1', d
+          assert d.get('counts',{}).get('users') == 239, d
+          print('PostgreSQL public health contract PASS')
+          PY
+
+      - name: Show server logs on failure
+        if: failure()
+        run: cat /tmp/egm-postgres.log || true
+
+      - name: Stop server
+        if: always()
+        run: kill $(cat /tmp/egm-postgres.pid) 2>/dev/null || true
