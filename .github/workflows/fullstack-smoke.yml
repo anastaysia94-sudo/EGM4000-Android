@@ -25,7 +25,7 @@ jobs:
       - name: Assemble and syntax-check
         env: {EGM_ASSEMBLE_ONLY: "1"}
         run: |
-          python -m py_compile bootstrap_db.py storage.py live_intelligence.py server.py
+          python -m py_compile bootstrap_db.py storage.py live_intelligence.py admin_registry.py server.py
           python server.py
           node --check static/app.js
       - name: Fresh database bootstrap
@@ -35,12 +35,25 @@ jobs:
           python bootstrap_db.py --force
           python - <<'PY'
           import sqlite3
+          from admin_registry import ADMIN_CAPABILITIES,sync_admin_registry
+          from storage import connect
+          con=connect();sync_admin_registry(con);con.close()
           c=sqlite3.connect('data/egm4000.db')
           expected={'users':238,'gameplay_sessions':948,'tips':948,'forum_threads':237,'forum_replies':237,'blog_posts':237,'blog_comments':237,'surveys':2,'survey_questions':6,'admin_features':100,'monetization_channels':25,'return_features':49,'checklist':161}
           for table,n in expected.items():
               got=c.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0]
               assert got==n,(table,got,n)
-          print('full seed counts verified')
+          rows=c.execute('SELECT id,title,category,implementation_status FROM admin_features ORDER BY id').fetchall()
+          assert len(rows)==100
+          assert len(ADMIN_CAPABILITIES)==100
+          assert all(not title.startswith('Admin capability ') for _,title,_,_ in rows)
+          statuses={s:sum(1 for r in rows if r[3]==s) for s in {'implemented','modelled','provider_configuration_required'}}
+          assert statuses=={'implemented':38,'modelled':37,'provider_configuration_required':25},statuses
+          assert len({r[2] for r in rows})==8
+          assert c.execute("SELECT title FROM admin_features WHERE id='A057'").fetchone()[0]=='Coaching experiment comparison'
+          assert c.execute("SELECT done FROM checklist WHERE id='A057'").fetchone()[0]==1
+          assert c.execute("SELECT done FROM checklist WHERE id='A071'").fetchone()[0]==0
+          print('full seed + C007 Admin 100 registry verified',statuses)
           PY
           test -f data/seed_users_credentials.generated.csv
       - name: Public API smoke
