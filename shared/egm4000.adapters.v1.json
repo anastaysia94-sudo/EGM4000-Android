@@ -1,0 +1,14 @@
+{
+  "schema":"egm.adapter.registry.v1",
+  "updatedAt":"2026-09-05T19:17:00-07:00",
+  "adapters":[
+    {"id":"fire-kirin","name":"Fire Kirin","evidenceMode":"observed","writeAccess":false},
+    {"id":"panda-master","name":"Panda Master","evidenceMode":"observed","writeAccess":false},
+    {"id":"orion-stars","name":"Orion Stars","evidenceMode":"observed","writeAccess":false},
+    {"id":"juwa","name":"Juwa","evidenceMode":"observed","writeAccess":false},
+    {"id":"game-master","name":"Game Master / GameVault","evidenceMode":"observed","writeAccess":false},
+    {"id":"generic","name":"Generic Fish Shooter","evidenceMode":"observed","writeAccess":false},
+    {"id":"fsa","name":"F.S.A. Perfect Telemetry","evidenceMode":"exact","writeAccess":false,"ownedSeparateProduct":true}
+  ],
+  "rules":["Third-party adapters normalize only user-authorized visible/session evidence.","No adapter may infer hidden server state as fact.","F.S.A. remains a separate owned virtual/non-cash product and may emit exact telemetry through a protected bridge."]
+}

@@ -1,0 +1,7 @@
+data/egm4000.db
+data/server.secret
+OWNER_LOGIN.txt
+__pycache__/
+*.pyc
+.env
+.DS_Store
