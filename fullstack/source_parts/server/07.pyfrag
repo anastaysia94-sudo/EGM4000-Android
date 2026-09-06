@@ -1,0 +1,25 @@
+
+# C007 gameplay-intelligence owner diagnostics (A058-A060).
+from live_intelligence import ADAPTERS
+_c007_get_base=App.do_GET
+def _c007_intel_do_GET(self):
+    parsed=urlparse(self.path);path=parsed.path;q=parse_qs(parsed.query)
+    if path=='/api/admin/coaching-trends':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();rows=rowsdict(con.execute("SELECT platform,target_metric,result,COUNT(*) count,AVG(confidence) avg_confidence,AVG(percent_change) avg_percent_change FROM coaching_experiments GROUP BY platform,target_metric,result ORDER BY platform,target_metric,result").fetchall());total=scalar(con,'SELECT COUNT(*) FROM coaching_experiments');completed=scalar(con,"SELECT COUNT(*) FROM coaching_experiments WHERE status='completed'");con.close();return self.json({'schema':'egm.admin.coaching-trends.v1','total':total,'completed':completed,'rows':rows,'rule':'Behavior and evidence-quality comparisons only; random credit outcomes are excluded from coaching-success scoring.'})
+    if path=='/api/admin/evidence-quality':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();by_type=rowsdict(con.execute('SELECT evidence_type,COUNT(*) events,AVG(confidence) avg_confidence,COUNT(DISTINCT live_session_id) sessions FROM normalized_events GROUP BY evidence_type ORDER BY events DESC').fetchall());by_platform=rowsdict(con.execute('SELECT platform,COUNT(*) events,AVG(confidence) avg_confidence,COUNT(DISTINCT live_session_id) sessions FROM normalized_events GROUP BY platform ORDER BY events DESC').fetchall());total=scalar(con,'SELECT COUNT(*) FROM normalized_events');con.close();return self.json({'schema':'egm.admin.evidence-quality.v1','total_events':total,'by_evidence_type':by_type,'by_platform':by_platform,'labels':['exact_telemetry','observed_evidence','estimate','correlation','hypothesis','unknown']})
+    if path=='/api/admin/adapter-health':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();rows=[]
+        for a in ADAPTERS:
+            aid=a['id'];events=scalar(con,'SELECT COUNT(*) FROM normalized_events WHERE platform=?',(aid,));sessions=scalar(con,'SELECT COUNT(*) FROM live_sessions WHERE platform=?',(aid,));last=rowdict(con.execute('SELECT event_time,evidence_type,confidence FROM normalized_events WHERE platform=? ORDER BY id DESC LIMIT 1',(aid,)).fetchone());state='ready'
+            if aid=='fsa' and not os.environ.get('EGM_FSA_TELEMETRY_TOKEN'):state='configuration_required'
+            rows.append({**a,'events':events,'sessions':sessions,'last_event':last,'state':state})
+        con.close();return self.json({'schema':'egm.admin.adapter-health.v1','adapters':rows,'exactTelemetryBoundary':'Only authenticated owned F.S.A. telemetry may use exact_telemetry.'})
+    return _c007_get_base(self)
+App.do_GET=_c007_intel_do_GET
