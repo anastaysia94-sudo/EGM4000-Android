@@ -1,0 +1,31 @@
+name: EGM4000 Core Loop Integration
+
+on:
+  push:
+    branches: [ main ]
+    paths: ["fullstack/**", "shared/**", ".github/workflows/integration-core-loop.yml"]
+  pull_request:
+    paths: ["fullstack/**", "shared/**", ".github/workflows/integration-core-loop.yml"]
+  workflow_dispatch:
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Validate FSA exact telemetry fixture
+        run: node shared/validate-fixtures.js
+      - name: Run fullstack core loop integration
+        working-directory: fullstack
+        run: python test_core_loop_integration.py
+      - name: Assemble and syntax-check public app
+        working-directory: fullstack
+        env: {EGM_ASSEMBLE_ONLY: "1"}
+        run: |
+          python -m py_compile bootstrap_db.py storage.py live_intelligence.py server.py test_core_loop_integration.py
+          python server.py
+          node --check static/app.js
