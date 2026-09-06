@@ -1,28 +1,35 @@
-# EGM4000 — Consolidated Full-Stack Live-Intelligence Track
+# EGM4000 — Runnable Full-Stack Reference
 
-This track extends the verified Android + Web/PWA v5 work with database-oriented live intelligence and the larger database-backed community/Admin continuity from later sessions.
+This directory is the database-backed reference track layered on top of the verified Android + Web/PWA v5 work.
 
-## Preserved continuity
-- first-run tutorial
-- 237 fictional seeded regular users + one owner in the private/reproducible dataset
-- 948 gameplay sessions + 948 coaching tips in that dataset
-- forum/blog/comments + moderation
-- first/unique and returning-user surveys
-- exactly 100 Admin capabilities
-- exactly 25 monetization capabilities A071–A095
-- 49 return-user features
-- safe Research Lab
+## Run locally
 
-## Live-learning additions
-- user-authorized capture boundary
-- normalized `egm.event.v1` evidence
-- read-only adapters for Fire Kirin, Panda Master, Orion Stars, Juwa, Game Master/GameVault, Generic Fish Shooter
-- rolling personal/platform baselines
-- Pattern Lab + Replay Lab architecture
-- evidence-grounded AI context packs
-- optional protected F.S.A. exact telemetry bridge
+```bash
+cd fullstack
+export EGM_OWNER_PASSWORD='use-a-new-long-random-secret'
+python bootstrap_db.py
+python server.py
+```
 
-The executable framework-neutral SQLite core is in `live_intelligence.py`. Private runtime databases, owner passwords, secrets, and user-specific state are intentionally excluded from public Git.
+Then open `http://127.0.0.1:8040`.
 
-## Evidence rule
-Motion/capture-derived generic signals are estimates unless manually verified. Exact telemetry is reserved for authorized exact sources such as the separate owned F.S.A. bridge. Correlation is never presented as causation or a prediction guarantee.
+The bootstrap creates **1 owner + 237 fictional test users**, **948 seeded gameplay sessions**, **948 tips**, **Admin 100**, **Monetization 25**, **Return 49**, and the live-event/baseline tables. Fictional test-user passwords are generated fresh into `data/seed_users_credentials.generated.csv`; that file, the SQLite database, owner password, and runtime secrets are gitignored.
+
+## Live intelligence
+
+`Game Session → Capture Adapter → Normalized Gameplay Events → Live Metrics → Pattern/Baseline Learning → Coaching Context → Replay`
+
+- normalized schema: `egm.event.v1`
+- evidence labels: exact telemetry, observed evidence, estimate, correlation, hypothesis, unknown
+- third-party adapters are read-only/user-authorized evidence sources
+- generic motion is an estimate, never hidden-server-state evidence
+- F.S.A. remains a separate owned virtual/non-cash product
+
+## Source
+
+- `bootstrap_db.py` — reproducible SQLite seed without committed passwords
+- `server.py` — standard-library HTTP/auth/API server
+- `live_intelligence.py` — normalized events, metrics, baselines, context packs
+- `static/` — mobile-friendly cyber-aquatic reference UI
+
+This is a strong beta/development reference, not a claim that public HTTPS deployment, signed Android release, provider integrations, off-host backups, legal review, or independent penetration testing are complete.
