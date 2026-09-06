@@ -11,6 +11,7 @@ This repository contains the current emergency launch rebuild that preserves the
 - `android-egm4000/` — native Android project for EGM4000 Fire Kirin Companion.
 - `web/` — local-first EGM4000 web/PWA public beta.
 - `shared/` — normalized gameplay event schema plus machine-readable continuity manifest.
+- `config/fire-kirin-portal.json` — configured Fire Kirin login portal used by Android and Web/PWA.
 - `contracts/` — safe contracts for F.S.A. telemetry and Founder Console integration.
 - `docs/` — safety, Fire Kirin companion, release ledger, project status, backlog, and AI continuation documentation.
 - `docs/ai-continuation/` — handoff prompts for ChatGPT, GitHub Copilot, Grok, and Perplexity.
@@ -56,17 +57,22 @@ Do not merge them into one unsafe product.
 
 ## Fire Kirin workflow
 
+Configured Fire Kirin login portal:
+
+`https://play.firekirin.xyz/web_game/firekirin777_pc/index.html`
+
 EGM4000 does **not** create a fake Fire Kirin login and does **not** store Fire Kirin credentials.
 
 The safe workflow is:
 
 1. Open EGM4000.
 2. Tap **Open Fire Kirin securely**.
-3. Sign in directly with Fire Kirin in the browser or official app/site.
-4. Return to EGM4000.
-5. Start authorized screen feedback.
-6. Log session evidence.
-7. Review EGM4000 feedback, replay, metrics, and tips.
+3. EGM4000 opens `https://play.firekirin.xyz/web_game/firekirin777_pc/index.html` externally.
+4. Sign in directly with Fire Kirin in the browser or official app/site.
+5. Return to EGM4000.
+6. Start authorized screen feedback.
+7. Log session evidence.
+8. Review EGM4000 feedback, replay, metrics, and tips.
 
 ## Safety boundary
 
