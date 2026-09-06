@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.weight
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedButton
@@ -198,12 +197,12 @@ fun BuildChecklistScreen(sessions: List<GameplaySession>, storageStatus: String)
     val appPrefs = context.getSharedPreferences("egm4000_app_v1", Context.MODE_PRIVATE)
     val communityPrefs = context.getSharedPreferences("egm4000_community_v1", Context.MODE_PRIVATE)
     val surveyPrefs = context.getSharedPreferences("egm4000_surveys_v1", Context.MODE_PRIVATE)
-    val checks = listOf(
+    val checks: List<Pair<String, Boolean>> = listOf(
         "Guided tutorial completed" to appPrefs.getBoolean("tutorial_complete", false),
         "Durable session store ready" to !storageStatus.startsWith("Storage warning"),
         "At least one session saved" to sessions.isNotEmpty(),
         "At least one normalized event saved" to sessions.any { it.events.isNotEmpty() },
-        "Capture permission exercised" to capturePrefs.getLong("startedAtMs", 0L) > 0L,
+        "Capture permission exercised" to (capturePrefs.getLong("startedAtMs", 0L) > 0L),
         "Community local storage initialized" to communityPrefs.contains("posts"),
         "Survey consent choice recorded" to surveyPrefs.contains("consent")
     )
