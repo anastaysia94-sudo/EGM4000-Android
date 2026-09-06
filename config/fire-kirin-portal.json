@@ -1,0 +1,18 @@
+{
+  "schema": "smartpickshop.egm4000.fire-kirin-portal.v1",
+  "updatedAt": "2026-09-05T17:05:00-07:00",
+  "defaultLoginUrl": "https://play.firekirin.xyz/web_game/firekirin777_pc/index.html",
+  "openMode": "external_browser_or_provider_app",
+  "credentialPolicy": {
+    "egm4000CollectsCredentials": false,
+    "egm4000StoresCredentials": false,
+    "egm4000ProxiesLogin": false,
+    "userSignsInDirectlyWithProvider": true
+  },
+  "usage": {
+    "androidDefault": true,
+    "webPwaDefault": true,
+    "userCanEditPortalUrlForTesting": true,
+    "resetButtonShouldRestoreThisUrl": true
+  }
+}
