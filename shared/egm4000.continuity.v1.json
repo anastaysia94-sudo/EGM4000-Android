@@ -1,6 +1,6 @@
 {
   "schema": "smartpickshop.egm4000.continuity.v1",
-  "updatedAt": "2026-09-06T03:15:00-07:00",
+  "updatedAt": "2026-09-06T03:23:00-07:00",
   "repository": "anastaysia94-sudo/EGM4000-Android",
   "project": {
     "name": "EGM4000 / EduGameMaster 4000",
@@ -19,8 +19,8 @@
   },
   "products": {
     "egm4000": {
-      "status": "Android v0.2 debug beta + persistent full-stack Web/PWA with integrated C006 Tips Center and C014 coaching experiment comparison",
-      "role": "Gameplay intelligence, authorized evidence logging, normalized metrics/replay, confidence-calibrated coaching, persistent follow-up comparison, community, privacy-safe surveys, and safe research.",
+      "status": "Android v0.2 debug beta + persistent full-stack Web/PWA with integrated C006 Tips Center, C014 coaching experiment comparison, and audited C007 Admin 100 registry",
+      "role": "Gameplay intelligence, authorized evidence logging, normalized metrics/replay, confidence-calibrated coaching, persistent follow-up comparison, community, privacy-safe surveys, owner administration, and safe research.",
       "paths": ["android-egm4000/", "web/", "fullstack/", "shared/", "docs/"]
     },
     "fsa": {
@@ -48,10 +48,21 @@
     },
     "incomplete": {
       "C003": "Production owner/auth boundary exists in the full-stack foundation but still requires deployment hardening, recovery controls, production secret/provider configuration and final security validation.",
-      "C007": "The full 100-feature owner Admin Panel is not complete end-to-end.",
-      "C008": "A071-A095 monetization capabilities exist in the canonical model but are not all end-to-end implemented.",
+      "C007": "Admin 100 now has a canonical 100-capability registry with real titles, nine categories, owner-visible evidence notes and CI integrity checks. Verified current state: 38 implemented, 37 modelled, 25 provider-configuration-required. Full end-to-end completion remains outstanding.",
+      "C008": "A071-A095 monetization capabilities are explicitly named and remain provider-configuration-required; they are not yet all end-to-end implemented.",
       "C009": "R001-R049 return-user features and adoption/retention instrumentation are not fully implemented."
     }
+  },
+  "admin100": {
+    "registry": "fullstack/admin_registry.py",
+    "ownerEndpoint": "GET /api/admin/features",
+    "ownerUi": "Owner Command Center -> Admin 100 implementation ledger",
+    "categories": 9,
+    "total": 100,
+    "implemented": 38,
+    "modelled": 37,
+    "providerConfigurationRequired": 25,
+    "rule": "A capability is not marked implemented unless a current route, persisted datastore, UI, or safety control concretely backs the claim. Planned/provider-dependent capabilities stay visibly incomplete."
   },
   "coreLoopIntegration": {
     "analysisSchema": "egm.analysis.v1",
@@ -93,7 +104,10 @@
     "workflow": ".github/workflows/integration-core-loop.yml",
     "lastVerifiedRunId": 34026860728,
     "lastVerifiedConclusion": "success",
-    "verifiedChecks": ["F.S.A. exact-telemetry fixture validation", "full-stack core-loop integration", "persistent C006 tip generation", "C014 baseline target upgrade", "C014 same-platform follow-up linking", "C014 Improved behavior classification", "random-credit outcome exclusion from experiment scoring", "public app assembly", "Python syntax check", "JavaScript syntax check"]
+    "admin100Workflow": ".github/workflows/fullstack-smoke.yml",
+    "admin100VerifiedRunId": 34027204091,
+    "admin100VerifiedConclusion": "success",
+    "verifiedChecks": ["F.S.A. exact-telemetry fixture validation", "full-stack core-loop integration", "persistent C006 tip generation", "C014 baseline target upgrade", "C014 same-platform follow-up linking", "C014 Improved behavior classification", "random-credit outcome exclusion from experiment scoring", "Admin 100 exactly 100 named capabilities", "Admin 100 contains no generic placeholder titles", "Admin 100 audited 38 implemented / 37 modelled / 25 provider-configuration-required split", "Admin 100 spans nine explicit categories", "A057 coaching experiment comparison is implemented", "A071 premium subscription plans remains incomplete/provider-dependent", "public app assembly", "fresh database bootstrap", "public API smoke", "Python syntax check", "JavaScript syntax check"]
   },
   "safetyBoundaries": {
     "noCredentialStorage": true,
@@ -106,7 +120,7 @@
     "researchLabAuthorizedSandboxOnly": true
   },
   "nextMilestones": [
-    {"id": "C007", "title": "Continue Admin 100", "definitionOfDone": "All A001-A100 capabilities are individually implemented/tested or explicitly marked incomplete; no model-only feature is presented as complete."},
+    {"id": "C007", "title": "Implement remaining Admin 100 capabilities", "definitionOfDone": "All A001-A100 capabilities are individually implemented/tested or explicitly marked incomplete; no model-only feature is presented as complete. Current audit baseline is 38/100 implemented."},
     {"id": "C008", "title": "Implement A071-A095 monetization", "definitionOfDone": "Exactly 25 monetization capabilities are implemented inside Admin 100 with safe, non-deceptive controls and measurement."},
     {"id": "C009", "title": "Implement R001-R049 + adoption analytics", "definitionOfDone": "49 return-user features exist and actual adoption/retention is instrumented without claiming guaranteed use."},
     {"id": "C003", "title": "Production auth/deployment hardening", "definitionOfDone": "Production secrets, sole-owner recovery/security controls, HTTPS deployment, rate/CSRF/session validation, backups, monitoring and final security QA are verified."},
