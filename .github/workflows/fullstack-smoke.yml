@@ -49,7 +49,7 @@ jobs:
           assert all(not title.startswith('Admin capability ') for _,title,_,_ in rows)
           statuses={s:sum(1 for r in rows if r[3]==s) for s in {'implemented','modelled','provider_configuration_required'}}
           assert statuses=={'implemented':38,'modelled':37,'provider_configuration_required':25},statuses
-          assert len({r[2] for r in rows})==8
+          assert len({r[2] for r in rows})==9
           assert c.execute("SELECT title FROM admin_features WHERE id='A057'").fetchone()[0]=='Coaching experiment comparison'
           assert c.execute("SELECT done FROM checklist WHERE id='A057'").fetchone()[0]==1
           assert c.execute("SELECT done FROM checklist WHERE id='A071'").fetchone()[0]==0
