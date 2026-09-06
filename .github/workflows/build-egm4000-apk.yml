@@ -5,6 +5,7 @@ on:
   push:
     branches: [ main ]
     paths:
+      - "buildsrc/**"
       - ".github/workflows/build-egm4000-apk.yml"
 
 jobs:
@@ -14,7 +15,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Reassemble EGM4000 Android source
+      - name: Reassemble and verify EGM4000 Android source
         shell: bash
         run: |
           cat buildsrc/egm4000-source.part1.b64 \
