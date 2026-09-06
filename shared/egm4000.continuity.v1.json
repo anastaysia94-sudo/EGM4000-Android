@@ -22,6 +22,13 @@
       "profit-guarantee casino language"
     ]
   },
+  "configuredThirdPartyPortals": {
+    "fireKirin": {
+      "defaultLoginUrl": "https://play.firekirin.xyz/web_game/firekirin777_pc/index.html",
+      "openMode": "external_browser_or_provider_app",
+      "credentialPolicy": "EGM4000 opens this externally and never asks for, proxies, captures, stores, or transmits Fire Kirin credentials."
+    }
+  },
   "products": {
     "egm4000": {
       "status": "debug beta foundation built",
@@ -47,9 +54,10 @@
   "currentBuildState": {
     "android": {
       "path": "android-egm4000/",
+      "fireKirinDefaultLoginUrl": "https://play.firekirin.xyz/web_game/firekirin777_pc/index.html",
       "buildArtifact": "EGM4000-Fire-Kirin-Companion-debug-apk",
       "apkName": "app-debug.apk",
-      "status": "GitHub Actions debug APK build succeeded previously; treat as beta/debug, not Play Store release.",
+      "status": "GitHub Actions debug APK build succeeded previously; rebuild after portal URL change before testing new default URL.",
       "knownGaps": [
         "Needs signed release build workflow.",
         "Needs stronger local persistence model beyond simple preferences if growing into production.",
@@ -59,6 +67,7 @@
     },
     "webPwa": {
       "path": "web/",
+      "fireKirinDefaultLoginUrl": "https://play.firekirin.xyz/web_game/firekirin777_pc/index.html",
       "status": "Local-first public beta shell with event logging, export/import, capture permission prompt, metrics, tips, replay.",
       "knownGaps": [
         "Needs HTTPS deployment.",
