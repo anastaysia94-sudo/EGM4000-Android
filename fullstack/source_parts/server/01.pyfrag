@@ -8,7 +8,7 @@ from http.cookies import SimpleCookie
 import base64,hashlib,hmac,json,mimetypes,os,re,secrets,time
 from bootstrap_db import bootstrap,hash_password
 from storage import connect,rowdict,rowsdict,scalar,insert_id
-from live_intelligence import ADAPTERS,append_event,metrics,migrate,start_session,context_pack,analyze_session
+from live_intelligence import ADAPTERS,append_event as _append_event,metrics,migrate,start_session,context_pack,analyze_session
 
 ROOT=Path(__file__).resolve().parent; STATIC=ROOT/'static'
 HOST=os.environ.get('EGM_HOST','0.0.0.0'); PORT=int(os.environ.get('PORT',os.environ.get('EGM_PORT','8040')))
@@ -30,6 +30,12 @@ def rate(bucket,key,limit,window):
     t=time.time();arr=[x for x in bucket.get(key,[]) if t-x<window]
     if len(arr)>=limit:return False
     arr.append(t);bucket[key]=arr;return True
+EVENT_ALIASES={'shot':'shot_fired','credit_up':'credit_change','credit_down':'credit_change','credit_changed':'credit_change'}
+def append_event(con,**kw):
+    raw=clean(kw.get('event_type'),80);norm=EVENT_ALIASES.get(raw,raw);payload=kw.get('payload') if isinstance(kw.get('payload'),dict) else {}
+    if norm!=raw:
+        payload=dict(payload);payload.setdefault('sourceType',raw);kw['payload']=payload;kw['event_type']=norm
+    return _append_event(con,**kw)
 
 class App(BaseHTTPRequestHandler):
     server_version='EGM4000/2.1'
