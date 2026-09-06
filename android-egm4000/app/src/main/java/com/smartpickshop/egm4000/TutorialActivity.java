@@ -37,7 +37,7 @@ public class TutorialActivity extends Activity {
             "Analytics summarize evidence already collected, such as event count, shot pace, credit movement, session length, drawdown patterns, and replay markers. Descriptive metrics do not reveal hidden server state or prove future outcomes.",
             "Use tips as evidence-labeled coaching. A tip should explain what evidence supports it and how confident the system is. Treat low-confidence signals as review cues, never guaranteed winning instructions.",
             "Bankroll Guard is a decision-support safety layer. Use limits, break reminders, drawdown review, and stop conditions instead of chasing losses or assuming a win is due.",
-            "Community is for registered-user posts, blogs, comments, reactions, reports, and moderated discussion. Community claims are user-generated content, not verified game evidence by default. This prototype stores tutorial state locally on this device.",
+            "Community is for registered-user posts, blogs, comments, reactions, reports, and moderated discussion. Community claims are user-generated content, not verified game evidence by default. Tutorial progress is stored locally on this device.",
             "The Research Lab is limited to local/original sandbox modding, reverse-engineering education, AI experiments, and defensive anti-cheat study in systems you own or are authorized to test. Do not bypass protections or compromise live third-party services without authorization."
     };
 
@@ -134,7 +134,7 @@ public class TutorialActivity extends Activity {
     }
 
     private void openApp() {
-        startActivity(new Intent(this, MainActivity.class));
+        startActivity(new Intent(this, ServerSetupActivity.class));
         finish();
     }
 
