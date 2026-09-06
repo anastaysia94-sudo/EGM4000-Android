@@ -1,0 +1,29 @@
+name: EGM4000 Core Loop Smoke
+
+on:
+  push:
+    paths:
+      - 'web/egm-core-loop.js'
+      - 'web/core-loop.html'
+      - 'shared/egm4000.analysis.v1.schema.json'
+      - 'tests/core-loop.test.js'
+      - '.github/workflows/core-loop-smoke.yml'
+  pull_request:
+    paths:
+      - 'web/egm-core-loop.js'
+      - 'web/core-loop.html'
+      - 'shared/egm4000.analysis.v1.schema.json'
+      - 'tests/core-loop.test.js'
+      - '.github/workflows/core-loop-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run deterministic core-loop smoke test
+        run: node tests/core-loop.test.js
