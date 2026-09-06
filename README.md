@@ -4,121 +4,49 @@ Cyber-aquatic gameplay intelligence for user-authorized session evidence.
 
 **Core loop:** Watch → Measure → Explain → Improve.
 
-This repository is the authoritative EGM4000 Android + Web/PWA continuation repository. It preserves the established product direction while keeping EGM4000, Fish Shooter Arcade (F.S.A.), and Founder Console as related but separate products.
+This repository is the authoritative EGM4000 Android + Web/PWA continuation repository. It preserves EGM4000, Fish Shooter Arcade (F.S.A.), and Founder Console as related but separate products.
 
 ## Current consolidated state
 
-The Web/PWA has been consolidated from verified prior EGM4000 builds and repository work. The merged build currently includes:
+- Native Android v0.2 account-aware evidence client with encrypted token storage, incremental sync, personalized Tips, JSON share/import, filters, session summaries, conservative risk flags, and evidence legend.
+- Persistent full-stack community/forum/blog backend with registered-user posting, replies/comments, reports, owner moderation, and audit events.
+- Privacy-safe first/returning/registered surveys with consent, pseudonymous visitor identifiers, persistent responses, and owner survey builder.
+- Responsive installable Web/PWA with Tips Center, Community, Blog, Surveys, Live Lab, account registration/login, and owner Admin controls.
+- 237 clearly synthetic seed users, 948 synthetic gameplay sessions, 948 evidence-linked seed tips, and seeded community content for testing.
+- Normalized gameplay evidence, live metrics, replay, learned baselines, and F.S.A. exact-telemetry boundary.
 
-- C001 — cyber-aquatic responsive redesign foundations.
-- C002 — first-run guided tutorial covering setup, session logging, analytics, evidence-labeled coaching, risk controls, community, survey privacy, and Research Lab safety.
-- C004 — registered-user local prototype community with forum topics, blog posts, comments, reactions, reports, owner moderation, and moderation audit records.
-- C005 — privacy-preserving first/returning visitor surveys with explicit consent/decline/erase controls, local pseudonymous visitor token, audience targeting, frequency caps, response storage, and owner-only local survey builder.
-- Fire Kirin secure external login workflow.
-- User-authorized browser screen feedback.
-- Local session evidence logger, metrics, replay, and evidence-based coaching.
-- JSON export/import and local persistence.
-- PWA manifest and service-worker cache.
+## Android v0.2
 
-The following major requirements are **not complete** and must not be represented as production-ready: C003 production owner authentication, C006 dedicated session-derived Tips Center, C007 complete 100-feature Admin Panel, C008 complete A071-A095 monetization implementation, and C009 full R001-R049 return-feature/adoption implementation.
+See `docs/ANDROID_V0_2.md`.
 
-## What is included
+The native client now supports the public-backend contract:
 
-- `android-egm4000/` — native Android project for EGM4000 Fire Kirin Companion.
-- `web/` — consolidated local-first EGM4000 web/PWA public beta.
-- `shared/` — normalized gameplay event schema plus machine-readable continuity manifest.
-- `config/fire-kirin-portal.json` — configured Fire Kirin login portal used by Android and Web/PWA.
-- `contracts/` — safe contracts for F.S.A. telemetry and Founder Console integration.
-- `docs/` — safety, Fire Kirin companion, release ledger, project status, backlog, consolidation notes, and AI continuation documentation.
-- `docs/ai-continuation/` — handoff prompts for ChatGPT, GitHub Copilot, Grok, and Perplexity.
-- `.github/workflows/build-egm4000-apk.yml` — builds the installable debug APK.
-- `.github/workflows/web-pwa-smoke.yml` — checks the web/PWA static build.
-- `.github/ISSUE_TEMPLATE/ai-continuation-task.md` — issue template for safe AI continuation tasks.
-- `.github/pull_request_template.md` — PR checklist that preserves safety and product boundaries.
-- `AGENTS.md` — rules for AI coding agents.
+- `POST /api/mobile/login`
+- `POST /api/mobile/sync`
+- `GET /api/mobile/tips`
 
-## Continue the project
-
-Before any assistant continues development, read these first:
-
-1. `AGENTS.md`
-2. `shared/egm4000.continuity.v1.json`
-3. `docs/RELEASE_LEDGER.md`
-4. `docs/IMPLEMENTATION_BACKLOG.md`
-5. `docs/CONSOLIDATED_WEB_V5.md`
-6. `docs/ai-continuation/README.md`
-
-## AI continuation docs
-
-Use these when continuing the project with another AI assistant:
-
-- `docs/ai-continuation/README.md` — master handoff index.
-- `docs/ai-continuation/PROJECT_STATUS_SV09.md` — historical status snapshot and known unfinished work.
-- `docs/ai-continuation/SAFETY_BOUNDARIES.md` — non-negotiable safety rules.
-- `docs/ai-continuation/NEXT_BUILD_PLAN.md` — next milestone plan.
-- `docs/ai-continuation/UPLOAD_TO_GITHUB_INSTRUCTIONS.md` — GitHub build/upload workflow.
-- `docs/ai-continuation/CHATGPT_CONTINUE_PROMPT.md` — prompt for ChatGPT.
-- `docs/ai-continuation/COPILOT_CONTINUE_PROMPT.md` — prompt for GitHub Copilot.
-- `docs/ai-continuation/GROK_CONTINUE_PROMPT.md` — prompt for Grok.
-- `docs/ai-continuation/PERPLEXITY_CONTINUE_PROMPT.md` — prompt for Perplexity.
+The deployed EGM4000 HTTPS server URL is editable in the app and intentionally not hard-coded until the canonical public deployment is finalized.
 
 ## Product boundaries
 
-EGM4000, F.S.A., and Founder Console are related but separate products.
-
-- **EGM4000**: analytics, coaching, replay, tips, normalized events, community, privacy-safe surveys, evidence labels.
-- **F.S.A. / Fish Shooter Arcade**: separate owned virtual/non-cash fish-shooter game that can provide exact telemetry.
-- **Founder Console**: separate owner/admin control plane for settings, safety, telemetry, moderation, surveys, and experiments.
-
-Do not merge them into one unsafe product.
+- **EGM4000:** analytics, authorized capture/evidence, coaching, replay, Tips, community, surveys, research, and owner administration.
+- **F.S.A. / Fish Shooter Arcade:** separate owned virtual/non-cash fish-shooter game that can provide exact telemetry to EGM4000.
+- **Founder Console:** separate owner/admin control plane for owned-product settings and experiments.
 
 ## Fire Kirin workflow
 
-Configured Fire Kirin login portal:
-
-`https://play.firekirin.xyz/web_game/firekirin777_pc/index.html`
-
-EGM4000 does **not** create a fake Fire Kirin login and does **not** store Fire Kirin credentials.
-
-The safe workflow is:
-
-1. Open EGM4000.
-2. Tap **Open Fire Kirin securely**.
-3. EGM4000 opens the Fire Kirin portal externally.
-4. Sign in directly with Fire Kirin in the browser or official app/site.
-5. Return to EGM4000.
-6. Start authorized screen feedback if desired.
-7. Log session evidence.
-8. Review EGM4000 feedback, replay, metrics, and tips.
+EGM4000 opens Fire Kirin externally and never collects or stores Fire Kirin credentials. The user signs in with the provider itself, returns to EGM4000, optionally authorizes screen feedback, records/observes session evidence, and reviews metrics/tips.
 
 ## Safety boundary
 
-EGM4000 does not guarantee profit, predict random outcomes, infer hidden server state, manipulate balances, bypass protections, or provide live-service cheating. It only explains authorized evidence and clearly labels estimates/hypotheses.
+EGM4000 does not guarantee profit, predict random outcomes, infer hidden third-party server state, manipulate balances, store third-party game passwords, bypass protections, or provide unauthorized live-service cheating. Research features remain limited to local/original/owned/authorized environments and defensive education.
 
-The Research Lab is limited to original/local sandbox software, owned or authorized test environments, reverse-engineering education, AI experiments, and defensive anti-cheat study.
+## Build Android APK
 
-## Build APK
+GitHub Actions workflow: **Build EGM4000 Android v0.2 APK**.
 
-Open GitHub → Actions → **Build EGM4000 Fire Kirin APK**. The output artifact is named:
+Artifact: `EGM4000-Android-v0.2-debug-apk` containing `app-debug.apk`.
 
-`EGM4000-Fire-Kirin-Companion-debug-apk`
+## Production status
 
-Inside that artifact is:
-
-`app-debug.apk`
-
-This is a debug/beta APK, not a Play Store production release.
-
-## Web/PWA
-
-Open `web/index.html` locally for most local-first features or host the `web/` folder on HTTPS. Browser screen feedback requires HTTPS and explicit user permission.
-
-## Next build priorities
-
-1. C003 — server-side sole-owner authentication boundary.
-2. C006 — dedicated session-derived Tips Center with evidence/confidence display.
-3. Continue C007 Admin 100 from verified partial state; do not mark incomplete features complete.
-4. Implement C008 A071-A095 monetization capabilities within Admin 100.
-5. Implement C009 R001-R049 with actual adoption/retention instrumentation.
-6. Android Evidence Review v0.2 and Web/PWA parity hardening.
-7. Shared schema validator, F.S.A. exact telemetry contract, signed Android release workflow, and device QA.
+Android v0.2 source is implemented. The public Web/PWA/backend source is deployment-ready. Remaining production gates include the canonical public HTTPS deployment, final Android server URL assignment, signed release/AAB, physical-device QA, monitoring/backups, and production-provider configuration.
