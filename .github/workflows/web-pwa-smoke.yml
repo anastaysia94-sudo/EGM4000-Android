@@ -3,7 +3,7 @@ name: EGM4000 Web PWA Smoke Test
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ main, full-egm4000-reconcile ]
     paths:
       - "web/**"
       - ".github/workflows/web-pwa-smoke.yml"
@@ -14,13 +14,27 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Verify web/PWA files
+      - name: Verify full EGM4000 web/PWA
+        shell: bash
         run: |
+          set -euo pipefail
           test -f web/index.html
           test -f web/manifest.webmanifest
           test -f web/sw.js
+          test -f web/assets/cyber_aquatic_reef.webp
+          test -f web/assets/sonar_lattice.webp
+          test -f web/assets/security_vault.webp
+          test -f web/assets/egm4000-mark.svg
           grep -q "PUBLIC BETA" web/index.html
           grep -q "Watch. Measure. Explain. Improve" web/index.html
           grep -q "egm4000.gameplay-event.v1" web/index.html
+          grep -q "https://play.firekirin.xyz/web_game/firekirin777_pc/index.html" web/index.html
+          for module in "Command Center" "Live Session" "Live Capture" "Event Stream" "Live Metrics" "Pattern Lab" "AI Coach" "Tips Center" "Alerts" "Replay Lab" "Experiment Lab" "Capture Validation" "Risk Monitor" "Strategy Simulator" "Game Profiles" "Community" "Surveys" "Data Exchange" "Research Lab" "Build Checklist" "Settings" "Fire Kirin Companion"; do
+            grep -q "$module" web/index.html
+          done
+          grep -q "indexedDB" web/index.html
+          grep -q "localStorage" web/index.html
+          grep -q "getDisplayMedia" web/index.html
+          grep -q "exact_telemetry" web/index.html
           python3 -m json.tool web/manifest.webmanifest >/dev/null
-          echo "EGM4000 web/PWA smoke test passed"
+          echo "EGM4000 full web/PWA smoke test passed"
