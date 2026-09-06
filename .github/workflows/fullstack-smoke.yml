@@ -1,0 +1,68 @@
+name: EGM4000 Fullstack Smoke
+
+on:
+  push:
+    branches: [ main ]
+    paths: ["fullstack/**", ".github/workflows/fullstack-smoke.yml"]
+  pull_request:
+    paths: ["fullstack/**", ".github/workflows/fullstack-smoke.yml"]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fullstack
+    env:
+      EGM_OWNER_PASSWORD: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Install runtime dependency
+        run: pip install -r requirements.txt
+      - name: Assemble and syntax-check
+        env: {EGM_ASSEMBLE_ONLY: "1"}
+        run: |
+          python -m py_compile bootstrap_db.py storage.py live_intelligence.py admin_registry.py server.py
+          python server.py
+          node --check static/app.js
+      - name: Fresh database and Admin 100 integrity
+        run: |
+          rm -rf data
+          python bootstrap_db.py --force
+          python - <<'PY'
+          import sqlite3
+          from admin_registry import sync_admin_registry
+          from storage import connect
+          con=connect();sync_admin_registry(con);con.close()
+          c=sqlite3.connect('data/egm4000.db')
+          rows=c.execute('SELECT id,title,category,implementation_status FROM admin_features ORDER BY id').fetchall()
+          assert len(rows)==100
+          statuses={s:sum(1 for r in rows if r[3]==s) for s in {'implemented','modelled','provider_configuration_required'}}
+          assert statuses=={'implemented':56,'modelled':19,'provider_configuration_required':25},statuses
+          for fid in ('A034','A041','A042','A043','A044','A045','A058','A059','A060'):
+              assert c.execute('SELECT done FROM checklist WHERE id=?',(fid,)).fetchone()[0]==1,fid
+          print('Admin 100 verified',statuses)
+          PY
+      - name: Public and owner API smoke
+        run: |
+          python server.py > /tmp/egm4000.log 2>&1 &
+          pid=$!
+          trap 'kill $pid || true' EXIT
+          for i in $(seq 1 25); do
+            curl -fsS http://127.0.0.1:8040/api/health | grep -q 'egm.event.v1' && break
+            sleep 1
+          done
+          python - <<'PY' > /tmp/login.json
+          import json,os
+          print(json.dumps({'username':'EGM4000Owner','password':os.environ['EGM_OWNER_PASSWORD']}))
+          PY
+          curl -fsS -c /tmp/egm.cookies -H 'Content-Type: application/json' --data-binary @/tmp/login.json http://127.0.0.1:8040/api/login | grep -q '"ok": true'
+          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/features | grep -q 'Cross-session trend dashboard'
+          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/coaching-trends | grep -q 'egm.admin.coaching-trends.v1'
+          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/evidence-quality | grep -q 'egm.admin.evidence-quality.v1'
+          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/adapter-health | grep -q 'egm.admin.adapter-health.v1'
