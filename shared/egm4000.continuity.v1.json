@@ -1,0 +1,119 @@
+{
+  "schema": "smartpickshop.egm4000.continuity.v1",
+  "updatedAt": "2026-09-05T17:05:00-07:00",
+  "repository": "anastaysia94-sudo/EGM4000-Android",
+  "project": {
+    "name": "EGM4000 / EduGameMaster 4000",
+    "ownerBrand": "SmartPickShop Holdings",
+    "tagline": "Watch. Measure. Explain. Improve.",
+    "coreLoop": [
+      "PLAY",
+      "EGM4000 WATCHES",
+      "MEASURES",
+      "ANALYZES",
+      "EXPLAINS",
+      "LEARNS"
+    ],
+    "tone": "adult premium cyberpunk + steampunk + cyber-aquatic control-room",
+    "doNotUseTone": [
+      "childish",
+      "toy-like",
+      "cutesy fish game",
+      "profit-guarantee casino language"
+    ]
+  },
+  "products": {
+    "egm4000": {
+      "status": "debug beta foundation built",
+      "role": "Gameplay intelligence, authorized evidence logging, metrics, replay, tips, coaching, normalized events.",
+      "paths": [
+        "android-egm4000/",
+        "web/",
+        "shared/",
+        "docs/"
+      ]
+    },
+    "fsa": {
+      "status": "separate product planned; integration contract needed next",
+      "role": "Owned virtual/non-cash fish shooter game that can emit exact telemetry to EGM4000.",
+      "mustRemainSeparate": true
+    },
+    "founderConsole": {
+      "status": "separate product planned; admin/control-plane contract needed next",
+      "role": "Owner/admin console for users, settings, safety, virtual credits, content, experiments, and telemetry.",
+      "mustRemainSeparate": true
+    }
+  },
+  "currentBuildState": {
+    "android": {
+      "path": "android-egm4000/",
+      "buildArtifact": "EGM4000-Fire-Kirin-Companion-debug-apk",
+      "apkName": "app-debug.apk",
+      "status": "GitHub Actions debug APK build succeeded previously; treat as beta/debug, not Play Store release.",
+      "knownGaps": [
+        "Needs signed release build workflow.",
+        "Needs stronger local persistence model beyond simple preferences if growing into production.",
+        "Needs richer MediaProjection analysis beyond permission/service foundation.",
+        "Needs instrumentation tests on actual devices."
+      ]
+    },
+    "webPwa": {
+      "path": "web/",
+      "status": "Local-first public beta shell with event logging, export/import, capture permission prompt, metrics, tips, replay.",
+      "knownGaps": [
+        "Needs HTTPS deployment.",
+        "Needs richer route/module structure.",
+        "Needs visual QA across mobile/tablet/desktop.",
+        "Needs shared schema validator."
+      ]
+    },
+    "sharedSchema": {
+      "path": "shared/",
+      "status": "Normalized gameplay event schema present; should be expanded into validators and fixtures."
+    }
+  },
+  "evidenceLabels": [
+    "exact_telemetry",
+    "observed_evidence",
+    "estimate",
+    "correlation",
+    "hypothesis",
+    "unknown"
+  ],
+  "safetyBoundaries": {
+    "noCredentialStorage": true,
+    "noFakeThirdPartyLogin": true,
+    "noHiddenServerStateClaims": true,
+    "noBalanceManipulation": true,
+    "noBypassOrCheating": true,
+    "noProfitGuarantees": true,
+    "noRandomOutcomeCertainty": true
+  },
+  "nextMilestones": [
+    {
+      "id": "C010",
+      "title": "Shared schema validator and fixtures",
+      "definitionOfDone": "Android and Web/PWA both produce/import normalized events that pass a shared JSON fixture validator."
+    },
+    {
+      "id": "C011",
+      "title": "Android Evidence Review v0.2",
+      "definitionOfDone": "Export/import, filters, risk flags, replay summary, and safety copy are implemented and tested."
+    },
+    {
+      "id": "C012",
+      "title": "Web/PWA module hardening",
+      "definitionOfDone": "Separate modules for Command Center, Event Stream, Metrics, Tips, Replay, Data Exchange, and Safety."
+    },
+    {
+      "id": "C013",
+      "title": "F.S.A. telemetry contract",
+      "definitionOfDone": "Owned game can emit exact virtual/non-cash telemetry to EGM4000 without third-party scraping."
+    },
+    {
+      "id": "C014",
+      "title": "Founder Console contract",
+      "definitionOfDone": "Admin settings and analytics contract exists without mutating unauthorized third-party systems."
+    }
+  ]
+}
