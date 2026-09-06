@@ -1,12 +1,12 @@
 {
   "schema": "smartpickshop.egm4000.continuity.v1",
-  "updatedAt": "2026-09-06T02:38:00-07:00",
+  "updatedAt": "2026-09-06T03:15:00-07:00",
   "repository": "anastaysia94-sudo/EGM4000-Android",
   "project": {
     "name": "EGM4000 / EduGameMaster 4000",
     "ownerBrand": "SmartPickShop Holdings",
     "tagline": "Watch. Measure. Explain. Improve.",
-    "coreLoop": ["PLAY", "EGM4000 WATCHES", "MEASURES", "ANALYZES", "EXPLAINS", "LEARNS"],
+    "coreLoop": ["PLAY", "EGM4000 WATCHES", "MEASURES", "ANALYZES", "EXPLAINS", "LEARNS", "RE-MEASURES"],
     "tone": "adult premium cyberpunk + steampunk + cyber-aquatic control-room",
     "doNotUseTone": ["childish", "toy-like", "cutesy fish game", "profit-guarantee casino language"]
   },
@@ -19,8 +19,8 @@
   },
   "products": {
     "egm4000": {
-      "status": "Android v0.2 debug beta + persistent full-stack Web/PWA with integrated core-loop analysis and C006 Tips Center",
-      "role": "Gameplay intelligence, authorized evidence logging, normalized metrics/replay, confidence-calibrated coaching, community, privacy-safe surveys, and safe research.",
+      "status": "Android v0.2 debug beta + persistent full-stack Web/PWA with integrated C006 Tips Center and C014 coaching experiment comparison",
+      "role": "Gameplay intelligence, authorized evidence logging, normalized metrics/replay, confidence-calibrated coaching, persistent follow-up comparison, community, privacy-safe surveys, and safe research.",
       "paths": ["android-egm4000/", "web/", "fullstack/", "shared/", "docs/"]
     },
     "fsa": {
@@ -43,7 +43,8 @@
       "C006": "Session-derived Tips Center integrated with the shared full-stack core loop. Live/Android-synced evidence produces persistent coaching with provenance/evidence type, confidence, sample size, metrics and uncertainty.",
       "C010": "Shared F.S.A. exact-telemetry fixture and validator added; integration CI validates the fixture and normalized contract.",
       "C011": "Android Evidence Review v0.2 account-aware sync client is implemented; its legacy event aliases are normalized by the server into the shared core-loop vocabulary.",
-      "C013": "EGM4000-side authenticated F.S.A. telemetry bridge implemented with a deployment-secret token, stable external-session mapping, duplicate protection and virtual/non-cash credit enforcement."
+      "C013": "EGM4000-side authenticated F.S.A. telemetry bridge implemented with deployment-secret authentication, stable external-session mapping, duplicate protection and virtual/non-cash credit enforcement.",
+      "C014": "Persistent coaching experiment comparison implemented. Eligible coaching saves a baseline metric, follows the strongest current recommendation while the baseline is active, automatically links a later same-platform session, and reports Improved/Worsened/Unchanged/Insufficient Evidence with sample sizes, confidence and uncertainty across Web and Android. Random credit outcomes are excluded from success scoring."
     },
     "incomplete": {
       "C003": "Production owner/auth boundary exists in the full-stack foundation but still requires deployment hardening, recovery controls, production secret/provider configuration and final security validation.",
@@ -54,11 +55,14 @@
   },
   "coreLoopIntegration": {
     "analysisSchema": "egm.analysis.v1",
+    "experimentSchema": "egm.coaching-experiment.v1",
     "canonicalNormalizedSchema": "egm.event.v1",
     "serverEngine": "fullstack/live_intelligence.py",
     "webLiveAnalysisEndpoint": "GET /api/live/analysis?session_id=<id>",
+    "webExperimentsEndpoint": "GET /api/experiments",
     "androidSyncEndpoint": "POST /api/mobile/sync",
     "androidTipsEndpoint": "GET /api/mobile/tips",
+    "androidExperimentsEndpoint": "GET /api/mobile/experiments",
     "fsaExactTelemetryEndpoint": "POST /api/fsa/telemetry",
     "fsaAuthHeader": "X-EGM-FSA-Token",
     "fsaSecretEnvironmentVariable": "EGM_FSA_TELEMETRY_TOKEN",
@@ -69,9 +73,11 @@
       "credit_changed": "credit_change"
     },
     "metrics": ["events", "shots", "hits", "kills", "breaks", "hit_rate", "credit_delta", "duration_min", "shots_per_min", "mean_motion", "motion_samples", "max_drawdown"],
+    "experimentEligibleMetrics": ["shots_per_min", "max_drawdown", "breaks", "evidence_completeness"],
+    "experimentResults": ["improved", "worsened", "unchanged", "insufficient_evidence"],
     "quality": ["confidence", "sampleSize", "evidenceType", "meanReliability", "completeness"],
     "patterns": ["negative recorded net movement", "pace increased while recorded results weakened", "meaningful recorded drawdown", "long session with no recorded break"],
-    "rule": "Analysis describes authorized recorded evidence only. Correlation is not causation and does not predict random outcomes or hidden server state."
+    "rule": "Analysis and C014 comparisons describe authorized recorded evidence only. Correlation is not causation. Random credit outcomes are never treated as proof coaching worked, and no hidden server state or future random outcome is predicted."
   },
   "evidenceLabels": ["exact_telemetry", "observed_evidence", "estimate", "correlation", "hypothesis", "unknown"],
   "exactTelemetryBoundary": {
@@ -85,9 +91,9 @@
   },
   "verification": {
     "workflow": ".github/workflows/integration-core-loop.yml",
-    "lastVerifiedRunId": 34025032046,
+    "lastVerifiedRunId": 34026860728,
     "lastVerifiedConclusion": "success",
-    "verifiedChecks": ["F.S.A. exact-telemetry fixture validation", "full-stack core-loop integration", "persistent C006 tip generation", "public app assembly", "Python syntax check", "JavaScript syntax check"]
+    "verifiedChecks": ["F.S.A. exact-telemetry fixture validation", "full-stack core-loop integration", "persistent C006 tip generation", "C014 baseline target upgrade", "C014 same-platform follow-up linking", "C014 Improved behavior classification", "random-credit outcome exclusion from experiment scoring", "public app assembly", "Python syntax check", "JavaScript syntax check"]
   },
   "safetyBoundaries": {
     "noCredentialStorage": true,
@@ -100,11 +106,11 @@
     "researchLabAuthorizedSandboxOnly": true
   },
   "nextMilestones": [
-    {"id": "C014", "title": "Persistent coaching experiment comparison", "definitionOfDone": "A coaching recommendation can save a baseline session and target metric, link a later comparable session, and report improved/worsened/unchanged/insufficient-evidence with confidence and uncertainty across Web and Android."},
     {"id": "C007", "title": "Continue Admin 100", "definitionOfDone": "All A001-A100 capabilities are individually implemented/tested or explicitly marked incomplete; no model-only feature is presented as complete."},
     {"id": "C008", "title": "Implement A071-A095 monetization", "definitionOfDone": "Exactly 25 monetization capabilities are implemented inside Admin 100 with safe, non-deceptive controls and measurement."},
     {"id": "C009", "title": "Implement R001-R049 + adoption analytics", "definitionOfDone": "49 return-user features exist and actual adoption/retention is instrumented without claiming guaranteed use."},
     {"id": "C003", "title": "Production auth/deployment hardening", "definitionOfDone": "Production secrets, sole-owner recovery/security controls, HTTPS deployment, rate/CSRF/session validation, backups, monitoring and final security QA are verified."},
-    {"id": "C015", "title": "Physical Android + public deployment QA", "definitionOfDone": "Canonical HTTPS backend is configured in Android, APK/AAB is signed, Web/PWA and Android are tested on real devices, and production monitoring/backups are active."}
+    {"id": "C015", "title": "Physical Android + public deployment QA", "definitionOfDone": "Canonical HTTPS backend is configured in Android, APK/AAB is signed, Web/PWA and Android are tested on real devices, and production monitoring/backups are active."},
+    {"id": "C016", "title": "Multi-session coaching effectiveness trends", "definitionOfDone": "Completed C014 comparisons roll into confidence-calibrated multi-session trends without turning correlations or random outcomes into causal claims."}
   ]
 }
