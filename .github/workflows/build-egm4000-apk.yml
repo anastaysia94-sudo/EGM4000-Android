@@ -3,7 +3,7 @@ name: Build EGM4000 Fire Kirin APK
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ main, full-egm4000-reconcile ]
     paths:
       - "android-egm4000/**"
       - ".github/workflows/build-egm4000-apk.yml"
@@ -42,6 +42,6 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: EGM4000-Fire-Kirin-Companion-debug-apk
+          name: EGM4000-Full-Intelligence-debug-apk
           path: android-egm4000/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
