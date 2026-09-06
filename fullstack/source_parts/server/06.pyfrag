@@ -41,8 +41,42 @@ def _admin_registry_do_GET(self):
         if target in ('forum_thread','forum_reply','blog_post','blog_comment'):where.append('target_type=?');args.append(target)
         clause=(' WHERE '+' AND '.join(where)) if where else ''
         con=db();rows=rowsdict(con.execute('SELECT * FROM reports'+clause+' ORDER BY id DESC LIMIT ?',tuple(args+[limit])).fetchall());con.close();return self.json({'count':len(rows),'reports':rows,'filters':{'status':status,'target_type':target}})
+    if path=='/api/admin/survey-analytics':
+        s=self.need(owner=True)
+        if not s:return
+        sid=int(qval(q,'survey_id','0') or 0);con=db();survey=rowdict(con.execute('SELECT * FROM surveys WHERE id=?',(sid,)).fetchone())
+        if not survey:con.close();return self.json({'error':'survey_not_found'},404)
+        questions=rowsdict(con.execute('SELECT * FROM survey_questions WHERE survey_id=? ORDER BY position,id',(sid,)).fetchall());total=scalar(con,'SELECT COUNT(*) FROM survey_responses WHERE survey_id=?',(sid,));answers=[]
+        for question in questions:
+            vals=rowsdict(con.execute('SELECT a.answer_text,COUNT(*) count FROM survey_answers a JOIN survey_responses r ON r.id=a.response_id WHERE r.survey_id=? AND a.question_id=? GROUP BY a.answer_text ORDER BY count DESC LIMIT 100',(sid,question['id'])).fetchall());answers.append({'question':question,'answer_counts':vals})
+        con.close();return self.json({'survey':survey,'responses':total,'questions':answers})
+    if path=='/api/admin/survey-export':
+        s=self.need(owner=True)
+        if not s:return
+        sid=int(qval(q,'survey_id','0') or 0);con=db();survey=rowdict(con.execute('SELECT id,title FROM surveys WHERE id=?',(sid,)).fetchone())
+        if not survey:con.close();return self.json({'error':'survey_not_found'},404)
+        rows=rowsdict(con.execute('SELECT r.id response_id,r.user_id,r.visitor_hash,r.created_at,q.id question_id,q.prompt,a.answer_text FROM survey_responses r LEFT JOIN survey_answers a ON a.response_id=r.id LEFT JOIN survey_questions q ON q.id=a.question_id WHERE r.survey_id=? ORDER BY r.id,q.position,q.id',(sid,)).fetchall());con.close();return self.json({'survey':survey,'rows':rows,'privacy':'visitor_hash is pseudonymous; raw IP addresses are not exported'})
     return _original_do_GET(self)
 App.do_GET=_admin_registry_do_GET
+
+# Admin writes added as audited C007 controls.
+_admin_post_base=App.do_POST
+def _c007_admin_do_POST(self):
+    path=urlparse(self.path).path
+    if path in ('/api/admin/pin-thread','/api/admin/survey-lifecycle'):
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        con=db()
+        if path=='/api/admin/pin-thread':
+            tid=int(b.get('thread_id',0));pinned=1 if b.get('pinned') else 0
+            if not con.execute('SELECT id FROM forum_threads WHERE id=?',(tid,)).fetchone():con.close();return self.json({'error':'thread_not_found'},404)
+            con.execute('UPDATE forum_threads SET pinned=?,updated_at=? WHERE id=?',(pinned,now(),tid));audit(con,s['id'],'thread_pinned' if pinned else 'thread_unpinned','forum_thread',tid);con.commit();con.close();return self.json({'ok':True,'thread_id':tid,'pinned':bool(pinned)})
+        sid=int(b.get('survey_id',0));status=clean(b.get('status'),20);frequency=max(1,min(3650,int(b.get('frequency_days',30) or 30)));starts=clean(b.get('starts_at'),80) or None;ends=clean(b.get('ends_at'),80) or None
+        if status not in ('draft','active','paused','closed'):con.close();return self.json({'error':'invalid_survey_status'},400)
+        if not con.execute('SELECT id FROM surveys WHERE id=?',(sid,)).fetchone():con.close();return self.json({'error':'survey_not_found'},404)
+        con.execute('UPDATE surveys SET status=?,frequency_days=?,starts_at=?,ends_at=? WHERE id=?',(status,frequency,starts,ends,sid));audit(con,s['id'],'survey_lifecycle_updated','survey',sid,{'status':status,'frequency_days':frequency,'starts_at':starts,'ends_at':ends});con.commit();con.close();return self.json({'ok':True,'survey_id':sid,'status':status,'frequency_days':frequency,'starts_at':starts,'ends_at':ends})
+    return _admin_post_base(self)
+App.do_POST=_c007_admin_do_POST
 
 # F.S.A. remains a separate owned product. Exact telemetry enters only through this
 # token-authenticated bridge; ordinary /api/live/event requests cannot self-label exact data.
