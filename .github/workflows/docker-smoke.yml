@@ -1,0 +1,57 @@
+name: EGM4000 Portable Docker Smoke
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "Dockerfile"
+      - "Procfile"
+      - "railway.toml"
+      - "fullstack/**"
+      - ".github/workflows/docker-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build production-style container
+        run: docker build -t egm4000:ci .
+
+      - name: Start EGM4000 container
+        run: |
+          docker run -d --name egm4000-ci \
+            -p 8040:8040 \
+            -e EGM_OWNER_PASSWORD='CI-only-owner-password-not-for-production' \
+            -e EGM_SECURE_COOKIES=0 \
+            egm4000:ci
+
+      - name: Verify HTTPS-host health contract locally
+        run: |
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8040/api/health > /tmp/health.json; then
+              break
+            fi
+            sleep 2
+          done
+          cat /tmp/health.json
+          python - <<'PY'
+          import json
+          data=json.load(open('/tmp/health.json'))
+          assert data.get('ok') is True, data
+          print('Docker health contract PASS')
+          PY
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker logs egm4000-ci || true
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f egm4000-ci || true
