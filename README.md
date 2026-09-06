@@ -8,24 +8,38 @@ This repository is the authoritative EGM4000 Android + Web/PWA continuation repo
 
 ## Current consolidated state
 
-- Native Android v0.2 account-aware evidence client with encrypted token storage, incremental sync, personalized Tips, JSON share/import, filters, session summaries, conservative risk flags, and evidence legend.
+- Native Android v0.2.1 account-aware evidence client with encrypted token storage, incremental sync, personalized Tips, JSON share/import, filters, session summaries, conservative risk flags, evidence legend, and a canonical HTTPS server-health setup screen.
 - Persistent full-stack community/forum/blog backend with registered-user posting, replies/comments, reports, owner moderation, and audit events.
 - Privacy-safe first/returning/registered surveys with consent, pseudonymous visitor identifiers, persistent responses, and owner survey builder.
 - Responsive installable Web/PWA with Tips Center, Community, Blog, Surveys, Live Lab, account registration/login, and owner Admin controls.
 - 237 clearly synthetic seed users, 948 synthetic gameplay sessions, 948 evidence-linked seed tips, and seeded community content for testing.
-- Normalized gameplay evidence, live metrics, replay, learned baselines, and F.S.A. exact-telemetry boundary.
+- Normalized gameplay evidence, live metrics, replay, learned baselines, C006 Tips Center, and the F.S.A. exact-telemetry boundary.
 
-## Android v0.2
+## Android v0.2.1
 
-See `docs/ANDROID_V0_2.md`.
+The native client supports the public-backend contract:
 
-The native client now supports the public-backend contract:
-
+- `GET /api/health`
 - `POST /api/mobile/login`
 - `POST /api/mobile/sync`
 - `GET /api/mobile/tips`
 
-The deployed EGM4000 HTTPS server URL is editable in the app and intentionally not hard-coded until the canonical public deployment is finalized.
+After the first-run tutorial, Android opens a server-connection screen. It validates the configured HTTPS host against `/api/health` and expects `ok=true` plus `schema=egm.event.v1`. The server URL remains editable for staging/recovery. Local evidence logging remains available when the public service is offline.
+
+## Render deployment
+
+The repository root contains `render.yaml`, which defines:
+
+- the `egm4000` public Python web service
+- the `egm4000-postgres` PostgreSQL database
+- internal `DATABASE_URL` wiring
+- generated visitor secret
+- secure-cookie mode
+- `/api/health` health checking
+
+Deployment runbook: `docs/RENDER_PUBLIC_DEPLOYMENT.md`.
+
+Current external blocker: Render's SmartPickShop workspace is returning HTTP 402 `Payment information is required` when creating both a free Postgres database and a free web service. The application source is deployment-ready; this account-level gate must be cleared before a canonical public URL can exist.
 
 ## Product boundaries
 
@@ -43,10 +57,10 @@ EGM4000 does not guarantee profit, predict random outcomes, infer hidden third-p
 
 ## Build Android APK
 
-GitHub Actions workflow: **Build EGM4000 Android v0.2 APK**.
+GitHub Actions workflow: **Build EGM4000 Android v0.2.1 APK**.
 
-Artifact: `EGM4000-Android-v0.2-debug-apk` containing `app-debug.apk`.
+Artifact: `EGM4000-Android-v0.2.1-debug-apk` containing `app-debug.apk`.
 
 ## Production status
 
-Android v0.2 source is implemented. The public Web/PWA/backend source is deployment-ready. Remaining production gates include the canonical public HTTPS deployment, final Android server URL assignment, signed release/AAB, physical-device QA, monitoring/backups, and production-provider configuration.
+Android v0.2.1 source is implemented and building in CI. The public Web/PWA/backend source is deployment-ready and has a Render Blueprint. Remaining production gates are the Render account billing gate, canonical HTTPS deployment verification, setting that verified public URL as the Android default, signed release/AAB, physical-device QA, monitoring/backups, and production-provider configuration.
