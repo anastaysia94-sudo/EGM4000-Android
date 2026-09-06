@@ -1,4 +1,4 @@
-const CACHE = 'egm4000-public-beta-v1';
+const CACHE = 'egm4000-public-beta-v2-c004';
 const ASSETS = ['./', './index.html', './manifest.webmanifest'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
