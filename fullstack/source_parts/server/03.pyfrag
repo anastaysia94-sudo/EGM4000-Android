@@ -27,7 +27,14 @@
         if path=='/api/mobile/tips':
             s=self.mobile();
             if not s:return self.json({'error':'mobile_auth_required'},401)
-            con=db();rows=con.execute('SELECT t.*,COALESCE(g.platform,l.platform) platform,COALESCE(g.started_at,l.started_at,t.created_at) started_at FROM tips t LEFT JOIN gameplay_sessions g ON g.id=t.session_id LEFT JOIN live_sessions l ON l.id=t.live_session_id WHERE t.user_id=? ORDER BY t.id DESC LIMIT 50',(s['id'],)).fetchall();con.close();return self.json(rowsdict(rows))
+            con=db();rows=rowsdict(con.execute('SELECT t.*,COALESCE(g.platform,l.platform) platform,COALESCE(g.started_at,l.started_at,t.created_at) started_at FROM tips t LEFT JOIN gameplay_sessions g ON g.id=t.session_id LEFT JOIN live_sessions l ON l.id=t.live_session_id WHERE t.user_id=? ORDER BY t.id DESC LIMIT 50',(s['id'],)).fetchall());exps={x['tip_id']:x for x in list_experiments(con,s['id'],100)}
+            for t in rows:
+                x=exps.get(t['id'])
+                if x:
+                    pct='' if x.get('percent_change') is None else f" ({float(x['percent_change']):+.1f}%)"
+                    t['body']=t.get('body','')+f"\n\nC014 comparison: {x.get('resultLabel','Insufficient Evidence')} · {x.get('metricLabel',x.get('target_metric'))}: {x.get('baseline_value')} → {x.get('followup_value')}{pct}."
+                    t['experiment_result']=x.get('result');t['experiment_status']=x.get('status');t['experiment_confidence']=x.get('confidence');t['experiment_uncertainty']=x.get('uncertainty')
+            con.close();return self.json(rows)
         if path=='/api/mobile/experiments':
             s=self.mobile();
             if not s:return self.json({'error':'mobile_auth_required'},401)
