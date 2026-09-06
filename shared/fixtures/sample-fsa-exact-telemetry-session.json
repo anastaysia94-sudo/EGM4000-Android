@@ -1,0 +1,17 @@
+{
+  "schema": "egm4000.fsa-session.v1",
+  "sourceProduct": "fsa",
+  "userId": 2,
+  "sessionId": "fsa-demo-session-001",
+  "events": [
+    {"sourceProduct":"fsa","sessionId":"fsa-demo-session-001","eventId":"evt-001","eventType":"session_started","occurredAt":"2026-09-06T09:00:00Z","evidenceLabel":"exact_telemetry","confidence":1,"payload":{"currencyType":"virtual_non_cash_credit","balanceAfter":1000}},
+    {"sourceProduct":"fsa","sessionId":"fsa-demo-session-001","eventId":"evt-002","eventType":"round_started","occurredAt":"2026-09-06T09:00:05Z","evidenceLabel":"exact_telemetry","confidence":1,"payload":{"round":1}},
+    {"sourceProduct":"fsa","sessionId":"fsa-demo-session-001","eventId":"evt-003","eventType":"shot_fired","occurredAt":"2026-09-06T09:00:10Z","evidenceLabel":"exact_telemetry","confidence":1,"payload":{"weaponLevel":2,"targetId":"fish-1","cost":5}},
+    {"sourceProduct":"fsa","sessionId":"fsa-demo-session-001","eventId":"evt-004","eventType":"credit_changed","occurredAt":"2026-09-06T09:00:10Z","evidenceLabel":"exact_telemetry","confidence":1,"payload":{"currencyType":"virtual_non_cash_credit","creditDelta":-5,"balanceAfter":995,"reason":"shot_fired"}},
+    {"sourceProduct":"fsa","sessionId":"fsa-demo-session-001","eventId":"evt-005","eventType":"target_hit","occurredAt":"2026-09-06T09:00:12Z","evidenceLabel":"exact_telemetry","confidence":1,"payload":{"targetId":"fish-1"}},
+    {"sourceProduct":"fsa","sessionId":"fsa-demo-session-001","eventId":"evt-006","eventType":"target_destroyed","occurredAt":"2026-09-06T09:00:13Z","evidenceLabel":"exact_telemetry","confidence":1,"payload":{"targetId":"fish-1"}},
+    {"sourceProduct":"fsa","sessionId":"fsa-demo-session-001","eventId":"evt-007","eventType":"credit_changed","occurredAt":"2026-09-06T09:00:13Z","evidenceLabel":"exact_telemetry","confidence":1,"payload":{"currencyType":"virtual_non_cash_credit","creditDelta":15,"balanceAfter":1010,"reason":"target_destroyed"}},
+    {"sourceProduct":"fsa","sessionId":"fsa-demo-session-001","eventId":"evt-008","eventType":"round_ended","occurredAt":"2026-09-06T09:00:30Z","evidenceLabel":"exact_telemetry","confidence":1,"payload":{"round":1}},
+    {"sourceProduct":"fsa","sessionId":"fsa-demo-session-001","eventId":"evt-009","eventType":"session_ended","occurredAt":"2026-09-06T09:00:35Z","evidenceLabel":"exact_telemetry","confidence":1,"payload":{"currencyType":"virtual_non_cash_credit","balanceAfter":1010}}
+  ]
+}
