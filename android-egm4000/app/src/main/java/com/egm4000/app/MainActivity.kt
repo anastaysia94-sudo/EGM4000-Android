@@ -35,11 +35,12 @@ class MainActivity : ComponentActivity() {
 }
 
 enum class Screen(val label: String) {
-    COMMAND("Command Center"), SESSION("Live Session"), CAPTURE("Live Capture"), EVENTS("Event Stream"),
-    METRICS("Live Metrics"), PATTERN("Pattern Lab"), COACH("AI Coach"), TIPS("Tips Center"),
-    ALERTS("Alerts"), REPLAY("Replay Lab"), EXPERIMENT("Experiment Lab"), VALIDATION("Capture Validation"),
-    RISK("Risk Monitor"), SIMULATOR("Strategy Simulator"), PROFILES("Game Profiles"),
-    DATA("Data Exchange"), RESEARCH("Research Lab"), SETTINGS("Settings"), FIRE_KIRIN("Fire Kirin")
+    TUTORIAL("Guided Tutorial"), COMMAND("Command Center"), SESSION("Live Session"), CAPTURE("Live Capture"),
+    EVENTS("Event Stream"), METRICS("Live Metrics"), PATTERN("Pattern Lab"), COACH("AI Coach"),
+    TIPS("Tips Center"), ALERTS("Alerts"), REPLAY("Replay Lab"), EXPERIMENT("Experiment Lab"),
+    VALIDATION("Capture Validation"), RISK("Risk Monitor"), SIMULATOR("Strategy Simulator"),
+    PROFILES("Game Profiles"), COMMUNITY("Community"), SURVEYS("Surveys"), DATA("Data Exchange"),
+    RESEARCH("Research Lab"), CHECKLIST("Build Checklist"), SETTINGS("Settings"), FIRE_KIRIN("Fire Kirin Companion")
 }
 
 data class EGMState(
@@ -63,13 +64,31 @@ fun EGM4000Theme(content: @Composable () -> Unit) {
 fun EGM4000App() {
     val context = LocalContext.current
     val store = remember { LocalSessionStore(context.applicationContext) }
-    var state by remember { mutableStateOf(EGMState(store.loadSessions(), storageStatus = store.storageStatus())) }
+    val appPrefs = remember { context.getSharedPreferences("egm4000_app_v1", Context.MODE_PRIVATE) }
+    val initialScreen = if (appPrefs.getBoolean("tutorial_complete", false)) Screen.COMMAND else Screen.TUTORIAL
+    var state by remember {
+        mutableStateOf(
+            EGMState(
+                sessions = store.loadSessions(),
+                screen = initialScreen,
+                storageStatus = store.storageStatus()
+            )
+        )
+    }
     var message by remember { mutableStateOf<String?>(null) }
+
+    fun navigate(next: Screen) {
+        state = state.copy(screen = next)
+    }
 
     fun persist(next: List<GameplaySession>) {
         val ok = store.saveSessions(next)
         val loaded = if (ok) store.loadSessions() else next
-        state = state.copy(sessions = loaded, selectedSessionId = loaded.lastOrNull()?.id, storageStatus = store.storageStatus())
+        state = state.copy(
+            sessions = loaded,
+            selectedSessionId = loaded.lastOrNull()?.id,
+            storageStatus = store.storageStatus()
+        )
         message = if (ok) "Session data saved and verified on disk." else store.storageStatus()
     }
 
@@ -80,7 +99,9 @@ fun EGM4000App() {
                 .putExtra(ScreenFeedbackService.EXTRA_RESULT_DATA, result.data)
             context.startForegroundService(svc)
             message = "Authorized screen feedback started. Aggregate signals only; raw frames are not saved."
-        } else message = "Screen feedback was not authorized."
+        } else {
+            message = "Screen feedback was not authorized."
+        }
     }
 
     fun startCapture() {
@@ -103,17 +124,36 @@ fun EGM4000App() {
             Column(Modifier.background(Color(0xEE071219)).padding(horizontal = 12.dp, vertical = 8.dp)) {
                 Text("EGM4000 // EduGameMaster 4000", color = Color(0xFF00F2FF), fontWeight = FontWeight.Black)
                 Text("Watch. Measure. Explain. Improve.  •  SV09 Full Intelligence Beta", style = MaterialTheme.typography.bodySmall, color = Color(0xFF8BA3AD))
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     Screen.entries.forEach { s ->
-                        FilterChip(selected = state.screen == s, onClick = { state = state.copy(screen = s) }, label = { Text(s.label) })
+                        FilterChip(
+                            selected = state.screen == s,
+                            onClick = { navigate(s) },
+                            label = { Text(s.label) }
+                        )
                     }
                 }
             }
         }
     ) { pad ->
-        Box(Modifier.fillMaxSize().padding(pad).background(Brush.verticalGradient(listOf(Color(0xFF06101A), Color(0xFF060B14), Color(0xFF0A1018))))) {
+        Box(
+            Modifier.fillMaxSize().padding(pad).background(
+                Brush.verticalGradient(listOf(Color(0xFF06101A), Color(0xFF060B14), Color(0xFF0A1018)))
+            )
+        ) {
             when (state.screen) {
-                Screen.COMMAND -> CommandCenterScreen(state, onNavigate = { state = state.copy(screen = it) }, onOpenFireKirin = ::openFireKirin)
+                Screen.TUTORIAL -> TutorialScreen(
+                    onComplete = {
+                        appPrefs.edit().putBoolean("tutorial_complete", true).commit()
+                        message = "Tutorial complete. EGM4000 is ready."
+                        navigate(Screen.COMMAND)
+                    },
+                    onNavigate = ::navigate
+                )
+                Screen.COMMAND -> CommandCenterScreen(state, onNavigate = ::navigate, onOpenFireKirin = ::openFireKirin)
                 Screen.SESSION -> SessionScreen(state.sessions, ::persist, state.storageStatus)
                 Screen.CAPTURE -> CaptureScreen(onStart = ::startCapture, onStop = ::stopCapture)
                 Screen.EVENTS -> EventStreamScreen(state.sessions)
@@ -128,16 +168,29 @@ fun EGM4000App() {
                 Screen.RISK -> RiskScreen(state.sessions)
                 Screen.SIMULATOR -> SimulatorScreen()
                 Screen.PROFILES -> GameProfilesScreen(state.sessions)
+                Screen.COMMUNITY -> CommunityScreen()
+                Screen.SURVEYS -> SurveysScreen()
                 Screen.DATA -> DataExchangeScreen(state.sessions, store, ::persist)
                 Screen.RESEARCH -> ResearchScreen()
-                Screen.SETTINGS -> SettingsScreen(state.storageStatus, onReload = {
-                    val loaded = store.loadSessions(); state = state.copy(sessions = loaded, storageStatus = store.storageStatus()); message = "Reloaded ${loaded.size} saved session(s)."
-                }, onClear = {
-                    store.clearAll(); state = state.copy(sessions = emptyList(), storageStatus = store.storageStatus()); message = "Local EGM4000 session data cleared."
-                })
+                Screen.CHECKLIST -> BuildChecklistScreen(state.sessions, state.storageStatus)
+                Screen.SETTINGS -> SettingsScreen(
+                    state.storageStatus,
+                    onReload = {
+                        val loaded = store.loadSessions()
+                        state = state.copy(sessions = loaded, storageStatus = store.storageStatus())
+                        message = "Reloaded ${loaded.size} saved session(s)."
+                    },
+                    onClear = {
+                        store.clearAll()
+                        state = state.copy(sessions = emptyList(), storageStatus = store.storageStatus())
+                        message = "Local EGM4000 session data cleared."
+                    }
+                )
                 Screen.FIRE_KIRIN -> FireKirinScreen(onOpen = ::openFireKirin, onCapture = ::startCapture, sessions = state.sessions)
             }
-            message?.let { Snackbar(Modifier.padding(16.dp).align(androidx.compose.ui.Alignment.BottomCenter)) { Text(it) } }
+            message?.let {
+                Snackbar(Modifier.padding(16.dp).align(androidx.compose.ui.Alignment.BottomCenter)) { Text(it) }
+            }
         }
     }
 }
