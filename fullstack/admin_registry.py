@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections import Counter
 
-IMPLEMENTED={1,2,3,5,7,10,11,12,13,14,16,17,18,19,20,30,31,32,33,46,47,48,49,50,51,52,54,55,56,57,63,64,68,70,96,97,99,100}
+IMPLEMENTED={1,2,3,5,7,10,11,12,13,14,15,16,17,18,19,20,21,22,30,31,32,33,46,47,48,49,50,51,52,53,54,55,56,57,63,64,68,70,96,97,99,100}
 PROVIDER_CONFIG=set(range(71,96))
 
 TITLES=[
@@ -32,10 +32,10 @@ for i in range(1,101):
 
 EVIDENCE={
 1:'Server owner-only routes require role=owner.',2:'Owner login uses PBKDF2-backed account authentication.',3:'Owner write endpoints enforce X-CSRF-Token.',5:'need(owner=True) enforces the owner boundary.',7:'audit_events records owner and user actions.',10:'EGM_SECURE_COOKIES enables Secure session cookies.',
-11:'users table and owner dashboard counts exist.',12:'users.status is persisted and queried.',13:'profiles persist display/favorite platform/focus.',14:'users.is_synthetic explicitly labels seeded accounts.',16:'status field provides suspension/inactivation model.',17:'role is exposed to the authenticated account.',18:'mobile_tokens are linked to users.',19:'dashboard/summary expose account-linked activity counts.',20:'forum/blog records persist user_id ownership.',
-30:'POST /api/admin/resolve-report resolves reports with audit.',31:'Owner blog posts publish immediately.',32:'Non-owner blog posts enter pending state.',33:'POST /api/admin/moderate changes persisted content status.',
+11:'GET /api/admin/users exposes the owner account directory.',12:'users.status is persisted and returned by the owner directory.',13:'GET /api/admin/user returns persisted profile fields.',14:'users.is_synthetic explicitly labels seeded accounts.',15:'GET /api/admin/users supports q, status, synthetic and limit filters.',16:'users.status provides suspension/inactivation model.',17:'role is exposed to authenticated owner account views.',18:'mobile_tokens are linked to users.',19:'owner user drilldown and dashboard expose account-linked activity counts.',20:'forum/blog records persist user_id ownership trace.',
+21:'GET /api/admin/reports provides an owner-only report queue.',22:'GET /api/admin/reports filters by status and target_type.',30:'POST /api/admin/resolve-report resolves reports with audit.',31:'Owner blog posts publish immediately.',32:'Non-owner blog posts enter pending state.',33:'POST /api/admin/moderate changes persisted content status.',
 46:'POST /api/admin/survey creates surveys and questions.',47:'surveys.audience supports all/first/returning/registered.',48:'POST /api/survey/consent persists pseudonymous consent.',49:'visitor_profiles classify first/returning users without raw IP storage.',50:'survey_responses and survey_answers persist responses.',
-51:'gameplay_sessions are persisted and counted.',52:'tips are persisted and shown in owner counts.',54:'egm.event.v1 metrics are computed from normalized events.',55:'GET /api/live/analysis exposes evidence-calibrated analysis.',56:'GET /api/live/replay exposes normalized evidence for the signed-in user.',57:'C014 coaching_experiments persist follow-up comparisons.',
+51:'gameplay_sessions are persisted and counted.',52:'tips are persisted and shown in owner counts.',53:'GET /api/admin/user returns per-user historical/live sessions, tips and coaching experiments.',54:'egm.event.v1 metrics are computed from normalized events.',55:'GET /api/live/analysis exposes evidence-calibrated analysis.',56:'GET /api/live/replay exposes normalized evidence for the signed-in user.',57:'C014 coaching_experiments persist follow-up comparisons.',
 63:'GET /api/admin/dashboard returns system counts.',64:'Health/API smoke routes and dashboard metrics are implemented.',68:'audit_events provides an operational audit trail.',70:'Deployment configuration is documented and surfaced through health checks.',
 96:'Analysis/evidence labels enforce exact vs observed/estimate boundaries.',97:'Product copy and analysis rules prohibit profit/random-outcome guarantees.',99:'checklist table is the canonical implementation ledger.',100:'Owner Command Center UI and owner dashboard API are implemented.'
 }
