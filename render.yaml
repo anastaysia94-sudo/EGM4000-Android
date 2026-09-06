@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: egm4000
+    runtime: python
+    plan: free
+    region: oregon
+    autoDeploy: true
+    buildCommand: cd fullstack && pip install -r requirements.txt
+    startCommand: cd fullstack && python server.py
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: egm4000-postgres
+          property: connectionString
+      - key: EGM_OWNER_PASSWORD
+        sync: false
+      - key: EGM_VISITOR_SECRET
+        generateValue: true
+      - key: EGM_SECURE_COOKIES
+        value: "1"
+      - key: EGM_HOST
+        value: "0.0.0.0"
+
+databases:
+  - name: egm4000-postgres
+    plan: free
+    region: oregon
+    postgresMajorVersion: "18"
