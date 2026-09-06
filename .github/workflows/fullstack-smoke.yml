@@ -1,0 +1,71 @@
+name: EGM4000 Fullstack Smoke
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/fullstack-smoke.yml"
+  pull_request:
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/fullstack-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fullstack
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax checks
+        run: |
+          python -m py_compile bootstrap_db.py server.py live_intelligence.py
+          node --check static/app.js
+      - name: Fresh database bootstrap
+        env:
+          EGM_OWNER_PASSWORD: ci-test-owner-password-not-for-production
+        run: |
+          rm -rf data
+          python bootstrap_db.py --force
+          python - <<'PY'
+          import sqlite3
+          c=sqlite3.connect('data/egm4000.db')
+          expected={
+            'users':238,
+            'gameplay_sessions':948,
+            'tips':948,
+            'admin_features':100,
+            'monetization_channels':25,
+            'return_features':49,
+            'checklist':161,
+          }
+          for table,n in expected.items():
+              got=c.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0]
+              assert got==n,(table,got,n)
+          print('seed counts verified')
+          PY
+          test -f data/seed_users_credentials.generated.csv
+      - name: Server health smoke
+        env:
+          EGM_OWNER_PASSWORD: ci-test-owner-password-not-for-production
+        run: |
+          python server.py > /tmp/egm4000.log 2>&1 &
+          pid=$!
+          trap 'kill $pid || true' EXIT
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8040/api/health | grep -q 'egm.event.v1'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/egm4000.log
+          exit 1
