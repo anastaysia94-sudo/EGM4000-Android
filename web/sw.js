@@ -1,5 +1,5 @@
-const CACHE = 'egm4000-web-pwa-v5-consolidated';
-const ASSETS = ['./', './index.html', './manifest.webmanifest'];
+const CACHE = 'egm4000-web-pwa-v5-core-loop-v1';
+const ASSETS = ['./', './index.html', './core-loop.html', './egm-core-loop.js', './manifest.webmanifest'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
 });
