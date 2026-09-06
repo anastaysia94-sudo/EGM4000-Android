@@ -25,6 +25,9 @@ import java.util.Locale;
 
 public class MainActivity extends Activity {
     private static final int REQ_CAPTURE = 4000;
+    private static final String DEFAULT_FIRE_KIRIN_URL = "https://play.firekirin.xyz/web_game/firekirin777_pc/index.html";
+    private static final String OLD_DEFAULT_FIRE_KIRIN_URL = "https://firekirin.com";
+
     private SharedPreferences prefs;
     private EditText portalUrl;
     private EditText sessionNote;
@@ -35,8 +38,16 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences("egm4000", MODE_PRIVATE);
+        migrateDefaultPortalUrl();
         buildUi();
         renderEvents();
+    }
+
+    private void migrateDefaultPortalUrl() {
+        String saved = prefs.getString("fireKirinUrl", "");
+        if (saved == null || saved.trim().isEmpty() || OLD_DEFAULT_FIRE_KIRIN_URL.equals(saved.trim())) {
+            prefs.edit().putString("fireKirinUrl", DEFAULT_FIRE_KIRIN_URL).apply();
+        }
     }
 
     private void buildUi() {
@@ -53,9 +64,11 @@ public class MainActivity extends Activity {
         root.addView(warning("PUBLIC BETA: user-authorized evidence only. EGM4000 does not predict random outcomes, guarantee profit, bypass protections, manipulate balances, or store Fire Kirin credentials."));
 
         root.addView(section("Fire Kirin Companion"));
-        portalUrl = input("Fire Kirin portal URL", prefs.getString("fireKirinUrl", "https://firekirin.com"));
+        portalUrl = input("Fire Kirin portal URL", prefs.getString("fireKirinUrl", DEFAULT_FIRE_KIRIN_URL));
         root.addView(portalUrl);
         root.addView(button("Open Fire Kirin securely", v -> openFireKirin()));
+        root.addView(button("Reset to configured Fire Kirin login", v -> resetFireKirinUrl()));
+        root.addView(label("Configured login portal: " + DEFAULT_FIRE_KIRIN_URL, 12, false));
         root.addView(label("Sign in directly with Fire Kirin in your browser. EGM4000 never asks for or stores your Fire Kirin password.", 14, false));
 
         root.addView(section("Authorized Screen Feedback"));
@@ -83,6 +96,12 @@ public class MainActivity extends Activity {
         root.addView(eventList);
 
         setContentView(scroll);
+    }
+
+    private void resetFireKirinUrl() {
+        portalUrl.setText(DEFAULT_FIRE_KIRIN_URL);
+        prefs.edit().putString("fireKirinUrl", DEFAULT_FIRE_KIRIN_URL).apply();
+        Toast.makeText(this, "Fire Kirin login URL reset to configured portal.", Toast.LENGTH_SHORT).show();
     }
 
     private void openFireKirin() {
