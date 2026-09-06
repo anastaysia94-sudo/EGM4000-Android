@@ -6,51 +6,44 @@ Use this backlog to continue development without restarting or forgetting the we
 
 - Keep `.github/workflows/build-egm4000-apk.yml` passing.
 - Keep `.github/workflows/web-pwa-smoke.yml` passing.
-- Do not remove Android, Web/PWA, `shared/`, or AI continuation docs.
+- Keep `.github/workflows/fullstack-smoke.yml` passing.
+- Do not remove Android, Web/PWA, `fullstack/`, `shared/`, or AI continuation docs.
 - Do not reintroduce corrupted split-base64 source as the main build path.
 
-## P1 — Android Evidence Review v0.2
+## P1 — Android Evidence Review v0.2 — IMPLEMENTED
 
-Goal: make the Android app feel like a usable EGM4000 companion rather than only a proof-of-build.
+Implemented in native Android v0.2:
 
-Tasks:
+- event filters: all, shots, credit changes, capture events, breaks, warnings;
+- JSON export/share using Android share sheet;
+- import/paste JSON with required-field validation and 1000-event cap;
+- session summary: start/end, shot count, total events, net credit movement, estimated pace, duration, breaks, warnings;
+- evidence label legend;
+- conservative risk flags for rising pace + credits down, long session, repeated credit-down entries, and no break logged;
+- visible reminder that feedback is descriptive evidence, not prediction;
+- EGM4000 mobile account login through `/api/mobile/login`;
+- Android Keystore encrypted bearer-token storage;
+- incremental cross-device evidence sync through `/api/mobile/sync`;
+- personalized evidence/confidence Tips refresh through `/api/mobile/tips`;
+- editable HTTPS backend URL until the canonical public deployment URL is finalized;
+- offline-first local logging and retry-safe failed sync behavior.
 
-- Add event filters: all, shots, credit changes, capture events, breaks, warnings.
-- Add export/share JSON button using Android share sheet.
-- Add import/paste JSON screen.
-- Add session summary fields: start time, end time, shot count, total events, net credit movement, estimated pace.
-- Add evidence label legend inside the app.
-- Add conservative risk flags:
-  - pace up + credits down;
-  - long session duration;
-  - repeated credit-down entries;
-  - no break logged.
-- Add visible reminder: feedback is not a prediction.
+Acceptance status:
 
-Acceptance check:
-
-- App builds with GitHub Actions.
-- User can export a session JSON file or share text.
-- No credential collection is added.
+- Source implemented and version bumped to `0.2.0-native-sync`.
+- GitHub Actions builds the installable debug APK and verifies the v0.2 source contract.
+- No third-party game credential collection was added.
 
 ## P2 — Web/PWA module hardening
 
-Goal: keep the web app alive as a first-class version, not a forgotten demo.
+The canonical `fullstack/static/` PWA now provides the persistent public-beta path. Continue visual/interaction parity work without removing the local-first `web/` track.
 
-Tasks:
+Remaining hardening:
 
-- Split `web/index.html` into clearer module sections or lightweight files.
-- Add Command Center, Event Stream, Metrics, Tips, Replay, Data Exchange, Safety, and Settings sections.
-- Validate imports before saving.
-- Add sample/demo session loader.
-- Add PWA install guidance.
-- Add no-backend privacy explainer.
-
-Acceptance check:
-
-- Web smoke workflow passes.
-- App opens locally with no external dependencies.
-- Exported event data follows `shared/normalized-gameplay-event.schema.json`.
+- final public HTTPS deployment and production URL;
+- cross-browser/device QA;
+- richer Replay/Pattern visualizations;
+- public production monitoring and error reporting.
 
 ## P3 — Shared schema validator
 
@@ -75,11 +68,10 @@ Goal: prepare the separate owned fish-shooter game to become EGM4000's clean exp
 
 Tasks:
 
-- Create `contracts/fsa-egm4000-telemetry.md`.
-- Define exact telemetry events: shot, target, hit, miss, enemy spawn, boss, credit change, power-up, round start/end.
-- Mark all F.S.A. credits as virtual/non-cash by default.
-- Add privacy and consent language.
-- Add sample telemetry JSON.
+- Keep `contracts/fsa-egm4000-telemetry.md` current.
+- Complete end-to-end exact telemetry test: shot, target, hit, miss, enemy spawn, boss, credit change, power-up, round start/end.
+- Keep all F.S.A. credits virtual/non-cash by default.
+- Keep privacy and consent language explicit.
 
 Acceptance check:
 
@@ -92,26 +84,23 @@ Goal: prepare admin features without creating unsafe balance or third-party mani
 
 Tasks:
 
-- Create `contracts/founder-console-egm4000.md`.
-- Define admin-safe controls: app settings, user roles, content, tips, experiments, feature flags, safety limits, virtual/non-cash F.S.A. settings.
+- Keep `contracts/founder-console-egm4000.md` current.
+- Limit controls to app settings, user roles, content, tips, experiments, feature flags, safety limits, and virtual/non-cash F.S.A. settings.
 - Explicitly prohibit third-party balance mutation, credential collection, bypass tools, or hidden-state access.
-
-Acceptance check:
-
-- Founder Console remains separate.
-- Admin controls are scoped to owned products and safe local settings.
 
 ## P6 — Production release path
 
 Tasks:
 
+- Complete public HTTPS deployment.
 - Add signed release workflow documentation.
 - Add `docs/ANDROID_RELEASE_SIGNING.md`.
 - Add versioning policy.
-- Add privacy policy draft for Android/Web.
-- Add testing checklist for Samsung Galaxy, Pixel, tablet, and desktop browser.
+- Finalize privacy policy for Android/Web.
+- Execute physical QA on Samsung Galaxy, Pixel, tablet, and desktop browsers.
 
 Acceptance check:
 
 - Debug APK remains easy to build.
-- Release build steps are documented without exposing secrets.
+- Signed release build steps are documented without exposing secrets.
+- Android v0.2 can point at the canonical public HTTPS EGM4000 endpoint.
