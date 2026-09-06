@@ -1,4 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Platform-only launch theme so resource linking does not depend on AppCompat/Material XML themes. -->
     <style name="Theme.EGM4000" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">false</item>
@@ -6,6 +8,7 @@
         <item name="android:navigationBarColor">#050914</item>
         <item name="android:colorAccent">#00F2FF</item>
         <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowNoTitle">true</item>
     </style>
     <style name="AppTheme" parent="Theme.EGM4000" />
 </resources>
