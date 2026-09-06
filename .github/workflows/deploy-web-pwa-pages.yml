@@ -1,11 +1,8 @@
 name: Deploy EGM4000 Web/PWA to GitHub Pages
 
+# Manual-only until GitHub Pages is enabled for this repository.
+# The connected GitHub App can deploy Pages but cannot create/enable the Pages site.
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - "web/**"
-      - ".github/workflows/deploy-web-pwa-pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -39,8 +36,6 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Upload Web/PWA artifact
         uses: actions/upload-pages-artifact@v3
