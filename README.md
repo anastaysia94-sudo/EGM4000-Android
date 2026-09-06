@@ -10,11 +10,25 @@ This repository contains the current emergency launch rebuild that preserves the
 
 - `android-egm4000/` — native Android project for EGM4000 Fire Kirin Companion.
 - `web/` — local-first EGM4000 web/PWA public beta.
-- `shared/` — normalized gameplay event schema.
-- `docs/` — safety, Fire Kirin companion, project status, and AI continuation documentation.
+- `shared/` — normalized gameplay event schema plus machine-readable continuity manifest.
+- `contracts/` — safe contracts for F.S.A. telemetry and Founder Console integration.
+- `docs/` — safety, Fire Kirin companion, release ledger, project status, backlog, and AI continuation documentation.
 - `docs/ai-continuation/` — handoff prompts for ChatGPT, GitHub Copilot, Grok, and Perplexity.
 - `.github/workflows/build-egm4000-apk.yml` — builds the installable debug APK.
 - `.github/workflows/web-pwa-smoke.yml` — checks the web/PWA static build.
+- `.github/ISSUE_TEMPLATE/ai-continuation-task.md` — issue template for safe AI continuation tasks.
+- `.github/pull_request_template.md` — PR checklist that preserves safety and product boundaries.
+- `AGENTS.md` — rules for AI coding agents.
+
+## Continue the project
+
+Before any assistant continues development, read these first:
+
+1. `AGENTS.md`
+2. `shared/egm4000.continuity.v1.json`
+3. `docs/RELEASE_LEDGER.md`
+4. `docs/IMPLEMENTATION_BACKLOG.md`
+5. `docs/ai-continuation/README.md`
 
 ## AI continuation docs
 
@@ -73,3 +87,12 @@ This is a debug/beta APK, not a Play Store production release.
 ## Web/PWA
 
 Open `web/index.html` locally or host the `web/` folder on HTTPS. Browser screen feedback requires HTTPS and user permission.
+
+## Next build priorities
+
+1. Android Evidence Review v0.2.
+2. Web/PWA module hardening.
+3. Shared schema validator and fixtures.
+4. F.S.A. exact telemetry contract implementation.
+5. Founder Console safe control-plane prototype.
+6. Signed Android release workflow and device QA.
