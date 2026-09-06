@@ -1,0 +1,55 @@
+{
+  "schema": "egm4000.admin100.verified.v1",
+  "verifiedAt": "2026-09-06T03:27:00-07:00",
+  "repository": "anastaysia94-sudo/EGM4000-Android",
+  "milestone": "C007",
+  "status": "in_progress_verified_checkpoint",
+  "registry": "fullstack/admin_registry.py",
+  "ownerEndpoint": "GET /api/admin/features",
+  "ownerUi": "Owner Command Center -> Admin 100 implementation ledger",
+  "total": 100,
+  "categories": 9,
+  "counts": {
+    "implemented": 42,
+    "modelled": 33,
+    "provider_configuration_required": 25
+  },
+  "newlyImplementedThisCheckpoint": {
+    "A015": "User search and filters",
+    "A021": "Open report queue",
+    "A022": "Report filtering",
+    "A053": "Per-user gameplay drilldown"
+  },
+  "newOwnerApis": [
+    "GET /api/admin/users?q=<term>&status=<status>&synthetic=<0|1>&limit=<n>",
+    "GET /api/admin/user?id=<user_id>",
+    "GET /api/admin/reports?status=<open|resolved|all>&target_type=<type>&limit=<n>"
+  ],
+  "verification": {
+    "workflow": ".github/workflows/fullstack-smoke.yml",
+    "runId": 34027362478,
+    "commit": "6ed60cc09e2afc3f5fc5994d10b29cfe15877e5e",
+    "conclusion": "success",
+    "checks": [
+      "Python compile and deterministic source assembly",
+      "JavaScript syntax validation",
+      "fresh database bootstrap",
+      "exactly 100 Admin capabilities",
+      "42 implemented / 33 modelled / 25 provider-configuration-required",
+      "nine canonical categories",
+      "owner login",
+      "owner Admin 100 endpoint",
+      "owner user search including synthetic filter",
+      "owner per-user drilldown",
+      "owner filtered report queue",
+      "public API smoke"
+    ]
+  },
+  "integrityRule": "A capability is marked implemented only when concrete current code, persisted data, an owner/user surface or a safety control backs the claim and the applicable CI check passes.",
+  "nextRecommendedC007Tranche": [
+    "A023-A026 dedicated moderation queues/actions by content type",
+    "A034 pinned-thread controls",
+    "A041-A045 survey lifecycle, frequency enforcement, export and analytics",
+    "A058-A060 cross-session trends, evidence diagnostics and adapter health"
+  ]
+}
