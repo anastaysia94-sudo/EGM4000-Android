@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.weight
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedButton
@@ -74,39 +75,28 @@ fun CommunityScreen() {
         Panel("New local thread") {
             OutlinedTextField(title, { title = it }, label = { Text("Thread title") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(body, { body = it }, label = { Text("Post") }, minLines = 4, modifier = Modifier.fillMaxWidth())
-            Button(
-                onClick = {
-                    if (title.isNotBlank() || body.isNotBlank()) {
-                        val post = JSONObject().apply {
-                            put("id", UUID.randomUUID().toString())
-                            put("title", title.ifBlank { "Untitled thread" })
-                            put("body", body)
-                            put("authorLabel", "Local user")
-                            put("createdAtMs", System.currentTimeMillis())
-                            put("moderation", "local_draft")
-                        }
-                        savePosts(listOf(post) + posts)
-                        title = ""
-                        body = ""
+            Button(onClick = {
+                if (title.isNotBlank() || body.isNotBlank()) {
+                    val post = JSONObject().apply {
+                        put("id", UUID.randomUUID().toString())
+                        put("title", title.ifBlank { "Untitled thread" })
+                        put("body", body)
+                        put("authorLabel", "Local user")
+                        put("createdAtMs", System.currentTimeMillis())
+                        put("moderation", "local_draft")
                     }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Save local thread") }
-        }
-        Panel("Privacy / integrity") {
-            Text("This beta stores posts on this device. It does not fabricate registered users, testimonials, engagement counts or moderation outcomes.")
-        }
-        if (posts.isEmpty()) {
-            Panel("No local threads") { Text("Create a thread above.") }
-        } else {
-            posts.take(40).forEach { post ->
-                Panel(post.optString("title", "Thread")) {
-                    Text(post.optString("body"))
-                    Text(
-                        "${post.optString("authorLabel", "Local user")} • ${formatTime(post.optLong("createdAtMs"))}",
-                        color = Color(0xFF9DB7C4)
-                    )
+                    savePosts(listOf(post) + posts)
+                    title = ""
+                    body = ""
                 }
+            }, modifier = Modifier.fillMaxWidth()) { Text("Save local thread") }
+        }
+        Panel("Privacy / integrity") { Text("This beta stores posts on this device. It does not fabricate registered users, testimonials, engagement counts or moderation outcomes.") }
+        if (posts.isEmpty()) Panel("No local threads") { Text("Create a thread above.") }
+        else posts.take(40).forEach { post ->
+            Panel(post.optString("title", "Thread")) {
+                Text(post.optString("body"))
+                Text("${post.optString("authorLabel", "Local user")} • ${formatTime(post.optLong("createdAtMs"))}", color = Color(0xFF9DB7C4))
             }
         }
     }
@@ -130,59 +120,43 @@ fun SurveysScreen() {
     Page("Privacy-preserving feedback", "Surveys", "Owner-style local survey prototype with explicit consent and no cross-site identity tracking.") {
         Panel("Consent") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Checkbox(
-                    checked = consent,
-                    onCheckedChange = {
-                        consent = it
-                        prefs.edit().putBoolean("consent", it).commit()
-                    }
-                )
+                Checkbox(checked = consent, onCheckedChange = {
+                    consent = it
+                    prefs.edit().putBoolean("consent", it).commit()
+                })
                 Text("Allow this EGM4000 install to store local survey responses on this device.")
             }
         }
         Panel("Create local survey") {
             OutlinedTextField(question, { question = it }, label = { Text("Question") }, modifier = Modifier.fillMaxWidth())
-            Button(
-                onClick = {
-                    if (question.isNotBlank()) {
-                        val survey = JSONObject().apply {
-                            put("id", UUID.randomUUID().toString())
-                            put("question", question)
-                            put("yes", 0)
-                            put("no", 0)
-                            put("createdAtMs", System.currentTimeMillis())
-                        }
-                        saveSurveys(listOf(survey) + surveys)
-                        question = ""
+            Button(onClick = {
+                if (question.isNotBlank()) {
+                    val survey = JSONObject().apply {
+                        put("id", UUID.randomUUID().toString())
+                        put("question", question)
+                        put("yes", 0)
+                        put("no", 0)
+                        put("createdAtMs", System.currentTimeMillis())
                     }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Save survey") }
+                    saveSurveys(listOf(survey) + surveys)
+                    question = ""
+                }
+            }, modifier = Modifier.fillMaxWidth()) { Text("Save survey") }
         }
         surveys.take(30).forEachIndexed { index, survey ->
             Panel(survey.optString("question", "Survey")) {
                 Text("Local responses: yes ${survey.optInt("yes")} • no ${survey.optInt("no")}")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        enabled = consent,
-                        onClick = {
-                            val next = surveys.toMutableList()
-                            val updated = JSONObject(survey.toString()).apply { put("yes", optInt("yes") + 1) }
-                            next[index] = updated
-                            saveSurveys(next)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Yes") }
-                    OutlinedButton(
-                        enabled = consent,
-                        onClick = {
-                            val next = surveys.toMutableList()
-                            val updated = JSONObject(survey.toString()).apply { put("no", optInt("no") + 1) }
-                            next[index] = updated
-                            saveSurveys(next)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) { Text("No") }
+                    Button(enabled = consent, onClick = {
+                        val next = surveys.toMutableList()
+                        next[index] = JSONObject(survey.toString()).apply { put("yes", optInt("yes") + 1) }
+                        saveSurveys(next)
+                    }, modifier = Modifier.weight(1f)) { Text("Yes") }
+                    OutlinedButton(enabled = consent, onClick = {
+                        val next = surveys.toMutableList()
+                        next[index] = JSONObject(survey.toString()).apply { put("no", optInt("no") + 1) }
+                        saveSurveys(next)
+                    }, modifier = Modifier.weight(1f)) { Text("No") }
                 }
                 if (!consent) Text("Enable consent before recording a response.", color = Color(0xFFFFB84A))
             }
@@ -198,35 +172,31 @@ fun BuildChecklistScreen(sessions: List<GameplaySession>, storageStatus: String)
     val communityPrefs = context.getSharedPreferences("egm4000_community_v1", Context.MODE_PRIVATE)
     val surveyPrefs = context.getSharedPreferences("egm4000_surveys_v1", Context.MODE_PRIVATE)
     val checks: List<Pair<String, Boolean>> = listOf(
-        "Guided tutorial completed" to appPrefs.getBoolean("tutorial_complete", false),
-        "Durable session store ready" to !storageStatus.startsWith("Storage warning"),
-        "At least one session saved" to sessions.isNotEmpty(),
-        "At least one normalized event saved" to sessions.any { it.events.isNotEmpty() },
-        "Capture permission exercised" to (capturePrefs.getLong("startedAtMs", 0L) > 0L),
-        "Community local storage initialized" to communityPrefs.contains("posts"),
-        "Survey consent choice recorded" to surveyPrefs.contains("consent")
+        Pair("Guided tutorial completed", appPrefs.getBoolean("tutorial_complete", false)),
+        Pair("Durable session store ready", !storageStatus.startsWith("Storage warning")),
+        Pair("At least one session saved", sessions.isNotEmpty()),
+        Pair("At least one normalized event saved", sessions.any { it.events.isNotEmpty() }),
+        Pair("Capture permission exercised", capturePrefs.getLong("startedAtMs", 0L) > 0L),
+        Pair("Community local storage initialized", communityPrefs.contains("posts")),
+        Pair("Survey consent choice recorded", surveyPrefs.contains("consent"))
     )
     val passed = checks.count { it.second }
     Page("Launch/readiness visibility", "Build Checklist", "This checklist reports local setup and evidence readiness; it does not substitute for physical-device QA.") {
         Metric("$passed/${checks.size}", "local readiness checks")
-        checks.forEach { (label, ok) ->
-            Panel(if (ok) "PASS" else "TODO") {
-                Text(label, color = if (ok) Color(0xFF38FFC6) else Color(0xFFFFB84A))
-            }
+        checks.forEach { check ->
+            val label = check.first
+            val ok = check.second
+            Panel(if (ok) "PASS" else "TODO") { Text(label, color = if (ok) Color(0xFF38FFC6) else Color(0xFFFFB84A)) }
         }
-        Panel("External gates") {
-            Text("Physical-device testing, signed Play Store release, public HTTPS hosting, legal review and independent security testing remain external release gates.")
-        }
+        Panel("External gates") { Text("Physical-device testing, signed Play Store release, public HTTPS hosting, legal review and independent security testing remain external release gates.") }
     }
 }
 
 private fun readObjects(raw: String): List<JSONObject> = runCatching {
     val array = JSONArray(raw)
     val out = mutableListOf<JSONObject>()
-    for (i in 0 until array.length()) {
-        array.optJSONObject(i)?.let { out.add(it) }
-    }
+    for (i in 0 until array.length()) array.optJSONObject(i)?.let { out.add(it) }
     out.toList()
 }.getOrDefault(emptyList())
 
-private fun formatTime(ms: Long): String = if (ms <= 0L) "unknown time" else DateFormat.getDateTimeInstance().format(Date(ms))
+private fun formatTime(ms: Long): String = if (ms <= 0L) "unknown time" else DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(ms))
