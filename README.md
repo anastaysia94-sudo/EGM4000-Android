@@ -4,15 +4,41 @@ Cyber-aquatic gameplay intelligence for user-authorized session evidence.
 
 **Core loop:** Watch → Measure → Explain → Improve.
 
-This repository now contains a clean emergency launch rebuild that preserves the established EGM4000 direction while making the project buildable from normal GitHub Actions infrastructure.
+This repository contains the current emergency launch rebuild that preserves the established EGM4000 direction while making the project buildable from normal GitHub Actions infrastructure.
 
 ## What is included
 
 - `android-egm4000/` — native Android project for EGM4000 Fire Kirin Companion.
 - `web/` — local-first EGM4000 web/PWA public beta.
 - `shared/` — normalized gameplay event schema.
-- `docs/` — safety, Fire Kirin companion, and project status documentation.
+- `docs/` — safety, Fire Kirin companion, project status, and AI continuation documentation.
+- `docs/ai-continuation/` — handoff prompts for ChatGPT, GitHub Copilot, Grok, and Perplexity.
 - `.github/workflows/build-egm4000-apk.yml` — builds the installable debug APK.
+- `.github/workflows/web-pwa-smoke.yml` — checks the web/PWA static build.
+
+## AI continuation docs
+
+Use these when continuing the project with another AI assistant:
+
+- `docs/ai-continuation/README.md` — master handoff index.
+- `docs/ai-continuation/PROJECT_STATUS_SV09.md` — current status and known unfinished work.
+- `docs/ai-continuation/SAFETY_BOUNDARIES.md` — non-negotiable safety rules.
+- `docs/ai-continuation/NEXT_BUILD_PLAN.md` — next milestone plan.
+- `docs/ai-continuation/UPLOAD_TO_GITHUB_INSTRUCTIONS.md` — GitHub build/upload workflow.
+- `docs/ai-continuation/CHATGPT_CONTINUE_PROMPT.md` — prompt for ChatGPT.
+- `docs/ai-continuation/COPILOT_CONTINUE_PROMPT.md` — prompt for GitHub Copilot.
+- `docs/ai-continuation/GROK_CONTINUE_PROMPT.md` — prompt for Grok.
+- `docs/ai-continuation/PERPLEXITY_CONTINUE_PROMPT.md` — prompt for Perplexity.
+
+## Product boundaries
+
+EGM4000, F.S.A., and Founder Console are related but separate products.
+
+- **EGM4000**: analytics, coaching, replay, tips, normalized events, evidence labels.
+- **F.S.A. / Fish Shooter Arcade**: separate owned virtual/non-cash fish-shooter game that can provide exact telemetry.
+- **Founder Console**: separate owner/admin control plane for settings, safety, telemetry, and experiments.
+
+Do not merge them into one unsafe product.
 
 ## Fire Kirin workflow
 
@@ -22,7 +48,7 @@ The safe workflow is:
 
 1. Open EGM4000.
 2. Tap **Open Fire Kirin securely**.
-3. Sign in directly with Fire Kirin in the browser.
+3. Sign in directly with Fire Kirin in the browser or official app/site.
 4. Return to EGM4000.
 5. Start authorized screen feedback.
 6. Log session evidence.
@@ -41,6 +67,8 @@ Open GitHub → Actions → **Build EGM4000 Fire Kirin APK**. The output artifac
 Inside that artifact is:
 
 `app-debug.apk`
+
+This is a debug/beta APK, not a Play Store production release.
 
 ## Web/PWA
 
