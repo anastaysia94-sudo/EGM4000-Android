@@ -10,7 +10,7 @@ android {
         applicationId = "com.smartpickshop.egm4000"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0-fire-kirin-companion"
+        versionCode = 2
+        versionName = "0.2.0-native-sync"
     }
 }
