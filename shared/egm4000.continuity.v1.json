@@ -1,26 +1,14 @@
 {
   "schema": "smartpickshop.egm4000.continuity.v1",
-  "updatedAt": "2026-09-05T17:05:00-07:00",
+  "updatedAt": "2026-09-05T19:26:00-07:00",
   "repository": "anastaysia94-sudo/EGM4000-Android",
   "project": {
     "name": "EGM4000 / EduGameMaster 4000",
     "ownerBrand": "SmartPickShop Holdings",
     "tagline": "Watch. Measure. Explain. Improve.",
-    "coreLoop": [
-      "PLAY",
-      "EGM4000 WATCHES",
-      "MEASURES",
-      "ANALYZES",
-      "EXPLAINS",
-      "LEARNS"
-    ],
+    "coreLoop": ["PLAY", "EGM4000 WATCHES", "MEASURES", "ANALYZES", "EXPLAINS", "LEARNS"],
     "tone": "adult premium cyberpunk + steampunk + cyber-aquatic control-room",
-    "doNotUseTone": [
-      "childish",
-      "toy-like",
-      "cutesy fish game",
-      "profit-guarantee casino language"
-    ]
+    "doNotUseTone": ["childish", "toy-like", "cutesy fish game", "profit-guarantee casino language"]
   },
   "configuredThirdPartyPortals": {
     "fireKirin": {
@@ -31,25 +19,39 @@
   },
   "products": {
     "egm4000": {
-      "status": "debug beta foundation built",
-      "role": "Gameplay intelligence, authorized evidence logging, metrics, replay, tips, coaching, normalized events.",
-      "paths": [
-        "android-egm4000/",
-        "web/",
-        "shared/",
-        "docs/"
-      ]
+      "status": "Android debug beta + consolidated Web/PWA v5",
+      "role": "Gameplay intelligence, authorized evidence logging, metrics, replay, coaching, community, privacy-safe surveys, normalized events, safe research.",
+      "paths": ["android-egm4000/", "web/", "shared/", "docs/"]
     },
     "fsa": {
-      "status": "separate product planned; integration contract needed next",
+      "status": "separate product; exact telemetry integration contract remains separate",
       "role": "Owned virtual/non-cash fish shooter game that can emit exact telemetry to EGM4000.",
       "mustRemainSeparate": true
     },
     "founderConsole": {
-      "status": "separate product planned; admin/control-plane contract needed next",
-      "role": "Owner/admin console for users, settings, safety, virtual credits, content, experiments, and telemetry.",
+      "status": "separate owner/admin control-plane product; EGM4000 includes only verified local prototype owner gates for community/surveys",
+      "role": "Owner/admin console for users, settings, safety, virtual credits, content, experiments, moderation, surveys, and telemetry.",
       "mustRemainSeparate": true
     }
+  },
+  "verifiedChecklistState": {
+    "completed": {
+      "C001": "Cyber-aquatic responsive redesign foundations.",
+      "C002": "First-run guided tutorial with persisted seen/completed state and safe workflow education.",
+      "C004": "Community forum/blog prototype with posts, comments, reactions, reports, owner moderation and audit records.",
+      "C005": "Privacy-preserving visitor surveys with consent/decline/erase, first-vs-returning classification, pseudonymous local token, targeting, frequency caps, response storage and owner-only local builder."
+    },
+    "incomplete": {
+      "C003": "Production sole-owner authentication is not complete; local role checks are prototype-only.",
+      "C006": "Dedicated session-derived Tips Center is not complete; existing evidence-based coaching is a foundation only.",
+      "C007": "The full 100-feature owner Admin Panel is not complete.",
+      "C008": "A071-A095 monetization capabilities exist in the canonical model but are not all end-to-end implemented.",
+      "C009": "R001-R049 return-user features and adoption/retention instrumentation are not fully implemented."
+    }
+  },
+  "verifiedAdmin100Foundations": {
+    "complete": ["A016", "A019", "A020", "A046", "A047", "A048", "A055"],
+    "note": "These are verified foundations inherited from C004/C005 evidence. Other Admin 100 items remain partial/model-only until implemented and tested."
   },
   "currentBuildState": {
     "android": {
@@ -57,38 +59,22 @@
       "fireKirinDefaultLoginUrl": "https://play.firekirin.xyz/web_game/firekirin777_pc/index.html",
       "buildArtifact": "EGM4000-Fire-Kirin-Companion-debug-apk",
       "apkName": "app-debug.apk",
-      "status": "GitHub Actions debug APK build succeeded previously; rebuild after portal URL change before testing new default URL.",
-      "knownGaps": [
-        "Needs signed release build workflow.",
-        "Needs stronger local persistence model beyond simple preferences if growing into production.",
-        "Needs richer MediaProjection analysis beyond permission/service foundation.",
-        "Needs instrumentation tests on actual devices."
-      ]
+      "status": "Native Android debug/beta project preserved; current consolidation work did not replace Android source.",
+      "knownGaps": ["Needs signed release build workflow.", "Needs richer persistence/analysis for production.", "Needs richer MediaProjection analysis.", "Needs instrumentation tests on actual devices."]
     },
     "webPwa": {
       "path": "web/",
+      "version": "v5.0 consolidated",
       "fireKirinDefaultLoginUrl": "https://play.firekirin.xyz/web_game/firekirin777_pc/index.html",
-      "status": "Local-first public beta shell with event logging, export/import, capture permission prompt, metrics, tips, replay.",
-      "knownGaps": [
-        "Needs HTTPS deployment.",
-        "Needs richer route/module structure.",
-        "Needs visual QA across mobile/tablet/desktop.",
-        "Needs shared schema validator."
-      ]
+      "status": "Consolidated local-first PWA with Fire Kirin external launch, capture permission, evidence logger, metrics/replay/coaching, C002 tutorial, C004 community, C005 surveys, checklist/ledger, export/import, manifest and service worker.",
+      "knownGaps": ["Needs production backend/auth for shared accounts, owner privileges, moderation and surveys.", "Needs HTTPS deployment for browser capture.", "Needs dedicated C006 Tips Center.", "Needs complete Admin 100 and R001-R049 implementation.", "Needs visual/device QA and shared schema validator."]
     },
     "sharedSchema": {
       "path": "shared/",
-      "status": "Normalized gameplay event schema present; should be expanded into validators and fixtures."
+      "status": "Normalized gameplay event schema present; validators and fixtures remain a next milestone."
     }
   },
-  "evidenceLabels": [
-    "exact_telemetry",
-    "observed_evidence",
-    "estimate",
-    "correlation",
-    "hypothesis",
-    "unknown"
-  ],
+  "evidenceLabels": ["exact_telemetry", "observed_evidence", "estimate", "correlation", "hypothesis", "unknown"],
   "safetyBoundaries": {
     "noCredentialStorage": true,
     "noFakeThirdPartyLogin": true,
@@ -96,33 +82,17 @@
     "noBalanceManipulation": true,
     "noBypassOrCheating": true,
     "noProfitGuarantees": true,
-    "noRandomOutcomeCertainty": true
+    "noRandomOutcomeCertainty": true,
+    "researchLabAuthorizedSandboxOnly": true
   },
   "nextMilestones": [
-    {
-      "id": "C010",
-      "title": "Shared schema validator and fixtures",
-      "definitionOfDone": "Android and Web/PWA both produce/import normalized events that pass a shared JSON fixture validator."
-    },
-    {
-      "id": "C011",
-      "title": "Android Evidence Review v0.2",
-      "definitionOfDone": "Export/import, filters, risk flags, replay summary, and safety copy are implemented and tested."
-    },
-    {
-      "id": "C012",
-      "title": "Web/PWA module hardening",
-      "definitionOfDone": "Separate modules for Command Center, Event Stream, Metrics, Tips, Replay, Data Exchange, and Safety."
-    },
-    {
-      "id": "C013",
-      "title": "F.S.A. telemetry contract",
-      "definitionOfDone": "Owned game can emit exact virtual/non-cash telemetry to EGM4000 without third-party scraping."
-    },
-    {
-      "id": "C014",
-      "title": "Founder Console contract",
-      "definitionOfDone": "Admin settings and analytics contract exists without mutating unauthorized third-party systems."
-    }
+    {"id": "C003", "title": "Production sole-owner authentication boundary", "definitionOfDone": "Server-side password hashing, secure sessions/cookies, CSRF protection, rate limiting, audit logs, recovery controls and owner authorization protect all privileged routes."},
+    {"id": "C006", "title": "Dedicated session-derived Tips Center", "definitionOfDone": "Tips are generated from monitored session evidence and display provenance, confidence, sample size, uncertainty and responsible-play context."},
+    {"id": "C007", "title": "Continue Admin 100", "definitionOfDone": "All A001-A100 capabilities are individually implemented/tested or explicitly marked incomplete; no model-only feature is presented as complete."},
+    {"id": "C008", "title": "Implement A071-A095 monetization", "definitionOfDone": "Exactly 25 monetization capabilities are implemented inside Admin 100 with safe, non-deceptive controls and measurement."},
+    {"id": "C009", "title": "Implement R001-R049 + adoption analytics", "definitionOfDone": "49 return-user features exist and actual adoption/retention is instrumented without claiming guaranteed use."},
+    {"id": "C010", "title": "Shared schema validator and fixtures", "definitionOfDone": "Android and Web/PWA both produce/import normalized events that pass a shared JSON fixture validator."},
+    {"id": "C011", "title": "Android Evidence Review v0.2", "definitionOfDone": "Export/import, filters, risk flags, replay summary, and safety copy are implemented and tested."},
+    {"id": "C013", "title": "F.S.A. telemetry contract", "definitionOfDone": "Owned game can emit exact virtual/non-cash telemetry to EGM4000 without third-party scraping."}
   ]
 }
