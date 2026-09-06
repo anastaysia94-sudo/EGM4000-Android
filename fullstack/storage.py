@@ -1,5 +1,5 @@
 from __future__ import annotations
-import os, sqlite3
+import os, re, sqlite3
 
 DATABASE_URL = os.environ.get('DATABASE_URL','').strip()
 POSTGRES = DATABASE_URL.startswith('postgres://') or DATABASE_URL.startswith('postgresql://')
@@ -51,8 +51,29 @@ def rowdict(row):
 
 def rowsdict(rows): return [rowdict(r) for r in rows]
 
+def _sync_postgres_serial_sequence(con, sql):
+    """Keep SERIAL ids ahead of explicit seed ids before public inserts.
+
+    EGM4000 intentionally seeds deterministic ids for users/community fixtures. PostgreSQL
+    sequences do not automatically advance when an explicit id is inserted, so the first
+    later INSERT could otherwise collide with an existing seed row. This helper derives the
+    trusted table name from the application's INSERT statement and advances that table's
+    serial sequence to MAX(id) immediately before auto-id insertion.
+    """
+    match=re.match(r'\s*INSERT\s+INTO\s+([A-Za-z_][A-Za-z0-9_]*)',sql,re.IGNORECASE)
+    if not match:return
+    table=match.group(1)
+    seq=scalar(con,"SELECT pg_get_serial_sequence(?, 'id')",(table,))
+    if not seq:return
+    max_id=scalar(con,f'SELECT MAX(id) FROM {table}')
+    if max_id is None:
+        con.execute('SELECT setval(?::regclass,1,false)',(seq,))
+    else:
+        con.execute('SELECT setval(?::regclass,?,true)',(seq,int(max_id)))
+
 def insert_id(con, sql, params=()):
     if con.postgres:
+        _sync_postgres_serial_sequence(con,sql)
         r=con.execute(sql.rstrip().rstrip(';')+' RETURNING id',params).fetchone()
         return int(r['id'])
     cur=con.execute(sql,params)
