@@ -8,7 +8,7 @@ from http.cookies import SimpleCookie
 import base64,hashlib,hmac,json,mimetypes,os,re,secrets,time
 from bootstrap_db import bootstrap,hash_password
 from storage import connect,rowdict,rowsdict,scalar,insert_id
-from live_intelligence import ADAPTERS,append_event,metrics,migrate,start_session,context_pack
+from live_intelligence import ADAPTERS,append_event,metrics,migrate,start_session,context_pack,analyze_session
 
 ROOT=Path(__file__).resolve().parent; STATIC=ROOT/'static'
 HOST=os.environ.get('EGM_HOST','0.0.0.0'); PORT=int(os.environ.get('PORT',os.environ.get('EGM_PORT','8040')))
@@ -32,7 +32,7 @@ def rate(bucket,key,limit,window):
     arr.append(t);bucket[key]=arr;return True
 
 class App(BaseHTTPRequestHandler):
-    server_version='EGM4000/2.0'
+    server_version='EGM4000/2.1'
     def log_message(self,fmt,*args):print('[EGM4000]',fmt%args)
     def body(self):
         try:return json.loads(self.rfile.read(int(self.headers.get('Content-Length','0') or 0)) or b'{}')
