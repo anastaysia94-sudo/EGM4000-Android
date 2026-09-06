@@ -1,6 +1,6 @@
 {
   "schema": "smartpickshop.egm4000.continuity.v1",
-  "updatedAt": "2026-09-05T19:26:00-07:00",
+  "updatedAt": "2026-09-06T02:38:00-07:00",
   "repository": "anastaysia94-sudo/EGM4000-Android",
   "project": {
     "name": "EGM4000 / EduGameMaster 4000",
@@ -19,18 +19,18 @@
   },
   "products": {
     "egm4000": {
-      "status": "Android debug beta + consolidated Web/PWA v5",
-      "role": "Gameplay intelligence, authorized evidence logging, metrics, replay, coaching, community, privacy-safe surveys, normalized events, safe research.",
-      "paths": ["android-egm4000/", "web/", "shared/", "docs/"]
+      "status": "Android v0.2 debug beta + persistent full-stack Web/PWA with integrated core-loop analysis and C006 Tips Center",
+      "role": "Gameplay intelligence, authorized evidence logging, normalized metrics/replay, confidence-calibrated coaching, community, privacy-safe surveys, and safe research.",
+      "paths": ["android-egm4000/", "web/", "fullstack/", "shared/", "docs/"]
     },
     "fsa": {
-      "status": "separate product; exact telemetry integration contract remains separate",
-      "role": "Owned virtual/non-cash fish shooter game that can emit exact telemetry to EGM4000.",
+      "status": "separate owned product with authenticated exact-telemetry bridge contract implemented on the EGM4000 side",
+      "role": "Owned virtual/non-cash fish shooter game that can emit exact telemetry to EGM4000 through the authenticated bridge.",
       "mustRemainSeparate": true
     },
     "founderConsole": {
-      "status": "separate owner/admin control-plane product; EGM4000 includes only verified local prototype owner gates for community/surveys",
-      "role": "Owner/admin console for users, settings, safety, virtual credits, content, experiments, moderation, surveys, and telemetry.",
+      "status": "separate owner/admin control-plane product; do not merge into EGM4000",
+      "role": "Owner/admin console for owned-product settings, safety, virtual credits, content, experiments, moderation, surveys, and telemetry.",
       "mustRemainSeparate": true
     }
   },
@@ -38,43 +38,57 @@
     "completed": {
       "C001": "Cyber-aquatic responsive redesign foundations.",
       "C002": "First-run guided tutorial with persisted seen/completed state and safe workflow education.",
-      "C004": "Community forum/blog prototype with posts, comments, reactions, reports, owner moderation and audit records.",
-      "C005": "Privacy-preserving visitor surveys with consent/decline/erase, first-vs-returning classification, pseudonymous local token, targeting, frequency caps, response storage and owner-only local builder."
+      "C004": "Community forum/blog with persistent backend, registered-user posting, reports, owner moderation and audit events.",
+      "C005": "Privacy-preserving visitor surveys with consent, first/returning/registered targeting, pseudonymous visitor identifiers, persistent responses and owner builder.",
+      "C006": "Session-derived Tips Center integrated with the shared full-stack core loop. Live/Android-synced evidence produces persistent coaching with provenance/evidence type, confidence, sample size, metrics and uncertainty.",
+      "C010": "Shared F.S.A. exact-telemetry fixture and validator added; integration CI validates the fixture and normalized contract.",
+      "C011": "Android Evidence Review v0.2 account-aware sync client is implemented; its legacy event aliases are normalized by the server into the shared core-loop vocabulary.",
+      "C013": "EGM4000-side authenticated F.S.A. telemetry bridge implemented with a deployment-secret token, stable external-session mapping, duplicate protection and virtual/non-cash credit enforcement."
     },
     "incomplete": {
-      "C003": "Production sole-owner authentication is not complete; local role checks are prototype-only.",
-      "C006": "Dedicated session-derived Tips Center is not complete; existing evidence-based coaching is a foundation only.",
-      "C007": "The full 100-feature owner Admin Panel is not complete.",
+      "C003": "Production owner/auth boundary exists in the full-stack foundation but still requires deployment hardening, recovery controls, production secret/provider configuration and final security validation.",
+      "C007": "The full 100-feature owner Admin Panel is not complete end-to-end.",
       "C008": "A071-A095 monetization capabilities exist in the canonical model but are not all end-to-end implemented.",
       "C009": "R001-R049 return-user features and adoption/retention instrumentation are not fully implemented."
     }
   },
-  "verifiedAdmin100Foundations": {
-    "complete": ["A016", "A019", "A020", "A046", "A047", "A048", "A055"],
-    "note": "These are verified foundations inherited from C004/C005 evidence. Other Admin 100 items remain partial/model-only until implemented and tested."
-  },
-  "currentBuildState": {
-    "android": {
-      "path": "android-egm4000/",
-      "fireKirinDefaultLoginUrl": "https://play.firekirin.xyz/web_game/firekirin777_pc/index.html",
-      "buildArtifact": "EGM4000-Fire-Kirin-Companion-debug-apk",
-      "apkName": "app-debug.apk",
-      "status": "Native Android debug/beta project preserved; current consolidation work did not replace Android source.",
-      "knownGaps": ["Needs signed release build workflow.", "Needs richer persistence/analysis for production.", "Needs richer MediaProjection analysis.", "Needs instrumentation tests on actual devices."]
+  "coreLoopIntegration": {
+    "analysisSchema": "egm.analysis.v1",
+    "canonicalNormalizedSchema": "egm.event.v1",
+    "serverEngine": "fullstack/live_intelligence.py",
+    "webLiveAnalysisEndpoint": "GET /api/live/analysis?session_id=<id>",
+    "androidSyncEndpoint": "POST /api/mobile/sync",
+    "androidTipsEndpoint": "GET /api/mobile/tips",
+    "fsaExactTelemetryEndpoint": "POST /api/fsa/telemetry",
+    "fsaAuthHeader": "X-EGM-FSA-Token",
+    "fsaSecretEnvironmentVariable": "EGM_FSA_TELEMETRY_TOKEN",
+    "eventAliasesNormalizedAtIngestion": {
+      "shot": "shot_fired",
+      "credit_up": "credit_change",
+      "credit_down": "credit_change",
+      "credit_changed": "credit_change"
     },
-    "webPwa": {
-      "path": "web/",
-      "version": "v5.0 consolidated",
-      "fireKirinDefaultLoginUrl": "https://play.firekirin.xyz/web_game/firekirin777_pc/index.html",
-      "status": "Consolidated local-first PWA with Fire Kirin external launch, capture permission, evidence logger, metrics/replay/coaching, C002 tutorial, C004 community, C005 surveys, checklist/ledger, export/import, manifest and service worker.",
-      "knownGaps": ["Needs production backend/auth for shared accounts, owner privileges, moderation and surveys.", "Needs HTTPS deployment for browser capture.", "Needs dedicated C006 Tips Center.", "Needs complete Admin 100 and R001-R049 implementation.", "Needs visual/device QA and shared schema validator."]
-    },
-    "sharedSchema": {
-      "path": "shared/",
-      "status": "Normalized gameplay event schema present; validators and fixtures remain a next milestone."
-    }
+    "metrics": ["events", "shots", "hits", "kills", "breaks", "hit_rate", "credit_delta", "duration_min", "shots_per_min", "mean_motion", "motion_samples", "max_drawdown"],
+    "quality": ["confidence", "sampleSize", "evidenceType", "meanReliability", "completeness"],
+    "patterns": ["negative recorded net movement", "pace increased while recorded results weakened", "meaningful recorded drawdown", "long session with no recorded break"],
+    "rule": "Analysis describes authorized recorded evidence only. Correlation is not causation and does not predict random outcomes or hidden server state."
   },
   "evidenceLabels": ["exact_telemetry", "observed_evidence", "estimate", "correlation", "hypothesis", "unknown"],
+  "exactTelemetryBoundary": {
+    "rule": "Only the separately owned F.S.A. integration may submit exact telemetry.",
+    "manualBrowserExactTelemetryAllowed": false,
+    "genericLiveEventExactTelemetryAllowed": false,
+    "fsaCredits": "virtual_non_cash_credit",
+    "fixture": "shared/fixtures/sample-fsa-exact-telemetry-session.json",
+    "validator": "shared/validate-fixtures.js",
+    "contract": "contracts/fsa-egm4000-telemetry.md"
+  },
+  "verification": {
+    "workflow": ".github/workflows/integration-core-loop.yml",
+    "lastVerifiedRunId": 34025032046,
+    "lastVerifiedConclusion": "success",
+    "verifiedChecks": ["F.S.A. exact-telemetry fixture validation", "full-stack core-loop integration", "persistent C006 tip generation", "public app assembly", "Python syntax check", "JavaScript syntax check"]
+  },
   "safetyBoundaries": {
     "noCredentialStorage": true,
     "noFakeThirdPartyLogin": true,
@@ -86,13 +100,11 @@
     "researchLabAuthorizedSandboxOnly": true
   },
   "nextMilestones": [
-    {"id": "C003", "title": "Production sole-owner authentication boundary", "definitionOfDone": "Server-side password hashing, secure sessions/cookies, CSRF protection, rate limiting, audit logs, recovery controls and owner authorization protect all privileged routes."},
-    {"id": "C006", "title": "Dedicated session-derived Tips Center", "definitionOfDone": "Tips are generated from monitored session evidence and display provenance, confidence, sample size, uncertainty and responsible-play context."},
+    {"id": "C014", "title": "Persistent coaching experiment comparison", "definitionOfDone": "A coaching recommendation can save a baseline session and target metric, link a later comparable session, and report improved/worsened/unchanged/insufficient-evidence with confidence and uncertainty across Web and Android."},
     {"id": "C007", "title": "Continue Admin 100", "definitionOfDone": "All A001-A100 capabilities are individually implemented/tested or explicitly marked incomplete; no model-only feature is presented as complete."},
     {"id": "C008", "title": "Implement A071-A095 monetization", "definitionOfDone": "Exactly 25 monetization capabilities are implemented inside Admin 100 with safe, non-deceptive controls and measurement."},
     {"id": "C009", "title": "Implement R001-R049 + adoption analytics", "definitionOfDone": "49 return-user features exist and actual adoption/retention is instrumented without claiming guaranteed use."},
-    {"id": "C010", "title": "Shared schema validator and fixtures", "definitionOfDone": "Android and Web/PWA both produce/import normalized events that pass a shared JSON fixture validator."},
-    {"id": "C011", "title": "Android Evidence Review v0.2", "definitionOfDone": "Export/import, filters, risk flags, replay summary, and safety copy are implemented and tested."},
-    {"id": "C013", "title": "F.S.A. telemetry contract", "definitionOfDone": "Owned game can emit exact virtual/non-cash telemetry to EGM4000 without third-party scraping."}
+    {"id": "C003", "title": "Production auth/deployment hardening", "definitionOfDone": "Production secrets, sole-owner recovery/security controls, HTTPS deployment, rate/CSRF/session validation, backups, monitoring and final security QA are verified."},
+    {"id": "C015", "title": "Physical Android + public deployment QA", "definitionOfDone": "Canonical HTTPS backend is configured in Android, APK/AAB is signed, Web/PWA and Android are tested on real devices, and production monitoring/backups are active."}
   ]
 }
