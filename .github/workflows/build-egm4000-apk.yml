@@ -5,7 +5,6 @@ on:
   push:
     branches: [ main ]
     paths:
-      - "buildsrc/**"
       - ".github/workflows/build-egm4000-apk.yml"
 
 jobs:
@@ -24,9 +23,9 @@ jobs:
               buildsrc/egm4000-source.part4.b64 \
             | tr -d '[:space:]' \
             | base64 -d > /tmp/egm4000-source.tar.gz
+          echo "0ee64d0032f7cf264dc26cecf9a142acad10af37a0014621cf8ff44e360acb39  /tmp/egm4000-source.tar.gz" | sha256sum -c -
           tar -xzf /tmp/egm4000-source.tar.gz
           test -f android-egm4000/app/build.gradle.kts
-          echo "EGM4000 Android source restored"
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -38,7 +37,6 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install Android 36 SDK
-        shell: bash
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
