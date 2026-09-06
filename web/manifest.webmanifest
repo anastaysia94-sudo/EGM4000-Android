@@ -1,11 +1,11 @@
 {
   "name": "EGM4000 — EduGameMaster 4000",
   "short_name": "EGM4000",
-  "start_url": "./index.html",
+  "start_url": "./c002-tutorial.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#060B14",
   "theme_color": "#00F2FF",
-  "description": "Local-first gameplay intelligence, replay, evidence-based feedback, and Fire Kirin companion flow.",
+  "description": "Local-first gameplay intelligence, replay, evidence-based feedback, guided onboarding, and Fire Kirin companion flow.",
   "icons": []
 }
