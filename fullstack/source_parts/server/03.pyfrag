@@ -8,6 +8,10 @@
             sid=int(qval(q,'session_id','0') or 0);con=db();owned=con.execute('SELECT id FROM live_sessions WHERE id=? AND user_id=?',(sid,s['id'])).fetchone()
             if not owned:con.close();return self.json({'error':'session_not_found'},404)
             out=analyze_session(con,s['id'],sid);con.close();return self.json(out)
+        if path=='/api/experiments':
+            s=self.need();
+            if not s:return
+            con=db();out=list_experiments(con,s['id'],50);con.close();return self.json(out)
         if path=='/api/live/context':
             s=self.need();
             if not s:return
@@ -15,7 +19,7 @@
         if path=='/api/admin/dashboard':
             s=self.need(owner=True);
             if not s:return
-            con=db();counts={t:scalar(con,f'SELECT COUNT(*) FROM {t}') for t in ['users','forum_threads','forum_replies','blog_posts','blog_comments','reports','surveys','survey_responses','gameplay_sessions','tips','admin_features','monetization_channels','return_features']};recent=rowsdict(con.execute('SELECT * FROM reports ORDER BY id DESC LIMIT 30').fetchall());con.close();return self.json({'counts':counts,'reports':recent})
+            con=db();counts={t:scalar(con,f'SELECT COUNT(*) FROM {t}') for t in ['users','forum_threads','forum_replies','blog_posts','blog_comments','reports','surveys','survey_responses','gameplay_sessions','tips','coaching_experiments','admin_features','monetization_channels','return_features']};recent=rowsdict(con.execute('SELECT * FROM reports ORDER BY id DESC LIMIT 30').fetchall());con.close();return self.json({'counts':counts,'reports':recent})
         if path=='/api/admin/surveys':
             s=self.need(owner=True);
             if not s:return
@@ -24,6 +28,10 @@
             s=self.mobile();
             if not s:return self.json({'error':'mobile_auth_required'},401)
             con=db();rows=con.execute('SELECT t.*,COALESCE(g.platform,l.platform) platform,COALESCE(g.started_at,l.started_at,t.created_at) started_at FROM tips t LEFT JOIN gameplay_sessions g ON g.id=t.session_id LEFT JOIN live_sessions l ON l.id=t.live_session_id WHERE t.user_id=? ORDER BY t.id DESC LIMIT 50',(s['id'],)).fetchall();con.close();return self.json(rowsdict(rows))
+        if path=='/api/mobile/experiments':
+            s=self.mobile();
+            if not s:return self.json({'error':'mobile_auth_required'},401)
+            con=db();out=list_experiments(con,s['id'],30);con.close();return self.json(out)
         return self.serve(path)
     def do_POST(self):
         path=urlparse(self.path).path;b=self.body();ip,_=self.client_key()
