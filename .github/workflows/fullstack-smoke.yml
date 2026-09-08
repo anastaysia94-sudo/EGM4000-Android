@@ -52,11 +52,25 @@ jobs:
         run: |
           python server.py > /tmp/egm4000.log 2>&1 &
           pid=$!
-          trap 'kill $pid || true' EXIT
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          ready=0
           for i in $(seq 1 25); do
-            curl -fsS http://127.0.0.1:8040/api/health | grep -q 'egm.event.v1' && break
+            if curl -fsS http://127.0.0.1:8040/api/health | grep -q 'egm.event.v1'; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              echo "EGM4000 server exited before becoming ready" >&2
+              cat /tmp/egm4000.log >&2 || true
+              exit 1
+            fi
             sleep 1
           done
+          if [ "$ready" -ne 1 ]; then
+            echo "EGM4000 server did not become ready within 25 seconds" >&2
+            cat /tmp/egm4000.log >&2 || true
+            exit 1
+          fi
           python - <<'PY' > /tmp/login.json
           import json,os
           print(json.dumps({'username':'EGM4000Owner','password':os.environ['EGM_OWNER_PASSWORD']}))
