@@ -40,7 +40,8 @@ enum class Screen(val label: String) {
     TIPS("Tips Center"), ALERTS("Alerts"), REPLAY("Replay Lab"), EXPERIMENT("Experiment Lab"),
     VALIDATION("Capture Validation"), RISK("Risk Monitor"), SIMULATOR("Strategy Simulator"),
     PROFILES("Game Profiles"), COMMUNITY("Community"), SURVEYS("Surveys"), DATA("Data Exchange"),
-    RESEARCH("Research Lab"), CHECKLIST("Build Checklist"), SETTINGS("Settings"), FIRE_KIRIN("Fire Kirin Companion")
+    RESEARCH("Research Lab"), CHECKLIST("Build Checklist"), SETTINGS("Settings"),
+    PROVIDERS("Connect Platforms"), FIRE_KIRIN("Fire Kirin Companion")
 }
 
 data class EGMState(
@@ -186,6 +187,7 @@ fun EGM4000App() {
                         message = "Local EGM4000 session data cleared."
                     }
                 )
+                Screen.PROVIDERS -> ProviderConnectScreen(onStartCapture = ::startCapture)
                 Screen.FIRE_KIRIN -> FireKirinScreen(onOpen = ::openFireKirin, onCapture = ::startCapture, sessions = state.sessions)
             }
             message?.let {
