@@ -148,7 +148,7 @@ fun EGM4000App() {
                 Screen.EVENTS -> EventStreamScreen(state.sessions)
                 Screen.METRICS -> MetricsScreen(state.sessions)
                 Screen.PATTERN -> PatternLabScreen(state.sessions)
-                Screen.COACH -> CoachScreen(state.sessions)
+                Screen.COACH -> AdaptiveCoachScreen(state.sessions)
                 Screen.TIPS -> TipsScreen(state.sessions)
                 Screen.ALERTS -> AlertsScreen(state.sessions)
                 Screen.REPLAY -> ReplayScreen(state.sessions)
