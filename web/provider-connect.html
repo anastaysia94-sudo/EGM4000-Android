@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>EGM4000 — Connect Game Platform</title>
+<style>
+:root{color-scheme:dark;--bg:#050b13;--panel:#0c1622;--ink:#eafcff;--muted:#91a9b5;--cyan:#00f2ff;--mint:#38ffc6;--warn:#ffb84a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0,#0d2b3d 0,#050b13 45%);color:var(--ink);font:15px/1.5 system-ui,sans-serif}.wrap{max-width:1100px;margin:auto;padding:24px}.hero{padding:24px;border:1px solid #173446;border-radius:24px;background:linear-gradient(135deg,#0c1723,#08111b)}h1{font-size:clamp(30px,5vw,58px);margin:0 0 8px;color:var(--cyan)}h2{margin:0 0 10px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:16px}.card{padding:18px;border:1px solid #173446;border-radius:18px;background:rgba(12,22,34,.92)}button,input,select{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #28516a;background:#07121d;color:var(--ink);margin-top:8px}button{cursor:pointer;font-weight:700}button.primary{background:#073845;border-color:#00b7c2;color:#dfffff}.status{margin-top:10px;color:var(--mint)}.warn{color:var(--warn)}video{width:100%;max-height:430px;background:#000;border-radius:14px;margin-top:12px}.metric{font-size:28px;font-weight:800;color:var(--mint)}small{color:var(--muted)}
+</style>
+</head>
+<body><main class="wrap">
+<section class="hero">
+<h1>Connect Game Platform</h1>
+<p>Sign in with the game provider itself, then explicitly share the gameplay window/screen with EGM4000. EGM4000 does not collect or proxy third-party usernames or passwords.</p>
+</section>
+<section class="grid">
+<div class="card"><h2>1 · Platform</h2><select id="provider"></select><input id="url" placeholder="Provider/player-issued HTTPS login URL"/><button class="primary" id="open">Open provider login</button><small id="providerNote"></small></div>
+<div class="card"><h2>2 · Live Capture</h2><button class="primary" id="share">Share gameplay screen/window</button><button id="stop">Stop capture</button><div class="status" id="captureStatus">Not sharing.</div><small>Browser screen sharing requires your explicit permission and works in supported Chromium/Edge-class browsers. On Windows, this page can run as an installed PWA.</small></div>
+<div class="card"><h2>3 · Live Signals</h2><div class="metric" id="motion">0%</div><small>screen-change estimate</small><div class="metric" id="brightness">0%</div><small>average luminance estimate</small><div class="status" id="tip">Start capture for evidence-aware coaching.</div></div>
+</section>
+<div class="card"><h2>Evidence boundary</h2><p>Real-time coaching is based only on pixels you explicitly share plus EGM4000 session/event history. It does not expose hidden server state, bypass protections, change balances, intercept credentials, or guarantee future random outcomes.</p><p class="warn">Use only player URLs supplied by the platform or your authorized operator/distributor. Do not paste backend/operator credentials into EGM4000.</p></div>
+<video id="preview" autoplay muted playsinline></video><canvas id="canvas" hidden width="320" height="180"></canvas>
+</main>
+<script>
+const providers=[
+{id:'fire_kirin',name:'Fire Kirin',url:'https://play.firekirin.xyz/web_game/firekirin777_pc/index.html',note:'External player login; credentials stay with Fire Kirin.'},
+{id:'panda_master',name:'Panda Master',url:'https://pandamaster.vip:8888',note:'Use the player URL provided by your operator if different.'},
+{id:'orion_stars',name:'Orion Stars',url:'https://orionstarsonline.com',note:'Use only your authorized player login URL.'},
+{id:'juwa',name:'Juwa',url:'',note:'Paste the exact HTTPS player URL supplied by your Juwa operator.'},
+{id:'game_master',name:'Game Master',url:'',note:'Paste the exact HTTPS player URL supplied by your Game Master operator.'},
+{id:'gameroom',name:'GameRoom',url:'',note:'Paste the exact HTTPS player URL supplied by your GameRoom operator.'}
+];
+const sel=document.querySelector('#provider'),url=document.querySelector('#url'),note=document.querySelector('#providerNote');
+providers.forEach(p=>sel.add(new Option(p.name,p.id)));
+function sync(){const p=providers.find(x=>x.id===sel.value);url.value=p.url;note.textContent=p.note}sel.onchange=sync;sync();
+document.querySelector('#open').onclick=()=>{try{const u=new URL(url.value.trim());if(u.protocol!=='https:')throw 0;window.open(u.href,'_blank','noopener,noreferrer')}catch{alert('Use a valid HTTPS player-login URL supplied by the provider/operator.')}};
+let stream=null,prev=null,timer=null;const video=document.querySelector('#preview'),canvas=document.querySelector('#canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true});
+function coach(m,b){let t='Steady scene. Record meaningful gameplay events and avoid drawing conclusions from short runs.';if(m>28)t='High screen activity detected. Focus on controlled inputs, take breaks, and record notable events before changing strategy.';else if(m>12)t='Moderate activity. Compare this segment with your saved session history rather than reacting to one event.';if(b<18)t+=' Visibility is low; capture quality may reduce confidence.';document.querySelector('#tip').textContent=t}
+function sample(){if(!stream)return;ctx.drawImage(video,0,0,320,180);const d=ctx.getImageData(0,0,320,180).data;let lum=0,diff=0,count=0;const cur=new Uint8Array(320*180);for(let i=0,j=0;i<d.length;i+=4,j++){const y=(d[i]*54+d[i+1]*183+d[i+2]*19)>>8;cur[j]=y;lum+=y;if(prev)diff+=Math.abs(y-prev[j]);count++}const b=lum/count/255*100,m=prev?diff/count/255*100:0;prev=cur;document.querySelector('#brightness').textContent=b.toFixed(1)+'%';document.querySelector('#motion').textContent=m.toFixed(1)+'%';coach(m,b)}
+document.querySelector('#share').onclick=async()=>{try{stream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:8,max:12}},audio:false});video.srcObject=stream;document.querySelector('#captureStatus').textContent='Authorized capture active. Raw frames are processed locally in this page.';timer=setInterval(sample,500);stream.getVideoTracks()[0].addEventListener('ended',stop)}catch{document.querySelector('#captureStatus').textContent='Screen sharing was not authorized.'}};
+function stop(){if(timer)clearInterval(timer);timer=null;if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;prev=null;video.srcObject=null;document.querySelector('#captureStatus').textContent='Capture stopped.'}document.querySelector('#stop').onclick=stop;
+</script></body></html>
