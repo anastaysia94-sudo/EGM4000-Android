@@ -62,6 +62,10 @@ fun ProviderConnectScreen(onStartCapture: () -> Unit) {
     var latestEvent by remember { mutableStateOf("") }
     var latestTip by remember { mutableStateOf("Start authorized Live Capture to activate provider-aware coaching.") }
     var overlayAllowed by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
+    var creditEstimate by remember { mutableStateOf("") }
+    var creditEstimateConfidence by remember { mutableStateOf(0f) }
+    var weaponEstimate by remember { mutableStateOf("") }
+    var weaponEstimateConfidence by remember { mutableStateOf(0f) }
 
     LaunchedEffect(selectedId) {
         providerPrefs.edit().putString("selected_provider_id", selectedId).apply()
@@ -77,6 +81,10 @@ fun ProviderConnectScreen(onStartCapture: () -> Unit) {
             confidence = capturePrefs.getFloat("confidence", 0f)
             latestEvent = capturePrefs.getString("latestEventType", "").orEmpty()
             latestTip = capturePrefs.getString("latestTip", latestTip) ?: latestTip
+            creditEstimate = capturePrefs.getString("visibleCreditsEstimate", "").orEmpty()
+            creditEstimateConfidence = capturePrefs.getFloat("visibleCreditsConfidence", 0f)
+            weaponEstimate = capturePrefs.getString("visibleWeaponLevelEstimate", "").orEmpty()
+            weaponEstimateConfidence = capturePrefs.getFloat("visibleWeaponLevelConfidence", 0f)
             overlayAllowed = Settings.canDrawOverlays(context)
             delay(750)
         }
@@ -127,7 +135,7 @@ fun ProviderConnectScreen(onStartCapture: () -> Unit) {
         }
 
         Panel("3. Authorized live capture") {
-            Text("After provider login, return here. Android's system dialog controls what is shared; EGM4000 processes a coarse visual grid in memory and does not persist raw frames.")
+            Text("After provider login, return here. Android's system dialog controls what is shared; EGM4000 processes visual signals locally and does not persist raw frames.")
             OutlinedButton(onClick = {
                 providerPrefs.edit().putString("selected_provider_id", selectedId).apply()
                 onStartCapture()
@@ -147,8 +155,10 @@ fun ProviderConnectScreen(onStartCapture: () -> Unit) {
             Text("Screen change: ${"%.1f".format(motion * 100)}% • brightness: ${"%.1f".format(brightness * 100)}%")
             Text("Target-field activity: ${"%.1f".format(targetActivity * 100)}%")
             Text("Estimated input/shot bursts in rolling minute: ${"%.0f".format(shotRate)}")
+            if (creditEstimate.isNotBlank()) Text("Visible credits OCR estimate: $creditEstimate • ${"%.0f".format(creditEstimateConfidence * 100)}% confidence", color = Color(0xFF38FFC6))
+            if (weaponEstimate.isNotBlank()) Text("Visible weapon/bet level OCR estimate: $weaponEstimate • ${"%.0f".format(weaponEstimateConfidence * 100)}% confidence", color = Color(0xFF38FFC6))
             if (latestEvent.isNotBlank()) Text("Latest normalized event: $latestEvent", color = Color(0xFF9DB7C4))
-            Text("Credit and weapon HUD regions are monitored for visible change. Numeric credits/weapon levels are not fabricated when recognition is not sufficiently validated.", color = Color(0xFF9DB7C4))
+            Text("Bundled on-device OCR alternates between provider-specific credit and weapon HUD regions. A numeric estimate is shown only after repeated recognition clears the confidence gate; incorrect HUD crops can still produce OCR errors and need device/provider calibration.", color = Color(0xFF9DB7C4))
         }
 
         Panel("6. EGM4000 AI Coach — live tip") {
@@ -157,13 +167,13 @@ fun ProviderConnectScreen(onStartCapture: () -> Unit) {
         }
 
         Panel("7. Session history + post-session analysis") {
-            Text("Authorized capture automatically creates a durable local ${selected.displayName} observation session. Confidence-labelled visual events are appended during capture and the session is closed when capture stops.")
+            Text("Authorized capture automatically creates a durable local ${selected.displayName} observation session. Confidence-labelled motion and OCR events are appended during capture and the session is closed when capture stops.")
             Text("Open Event Stream, Metrics, Pattern Lab, AI Coach or Replay Lab after the session to review normalized observations alongside recorded history.", color = Color(0xFF9DB7C4))
         }
 
         Panel("Evidence boundary") {
             Text("EGM4000 does not intercept usernames/passwords, read hidden provider server state, bypass protections, manipulate balances, or promise future random outcomes.")
-            Text("Visual signals are estimates with confidence labels. Use them to improve pacing, recordkeeping and decision discipline—not as guaranteed winning predictions.", color = Color(0xFFFFB84A))
+            Text("Visual/OCR signals are estimates with confidence labels. Use them to improve pacing, recordkeeping and decision discipline—not as guaranteed winning predictions.", color = Color(0xFFFFB84A))
         }
 
         Text(status, modifier = Modifier.padding(vertical = 4.dp), color = Color(0xFF38FFC6))
