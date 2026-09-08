@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
@@ -48,6 +49,11 @@ class ScreenFeedbackService : Service() {
     private var lastFlushAtMs = 0L
     private var lastNotificationAtMs = 0L
 
+    private val textExtractor = ProviderTextExtractor()
+    private var lastOcrAtMs = 0L
+    private var ocrWeaponNext = false
+    private val lastHudValue = mutableMapOf<String, String>()
+
     private var overlayManager: WindowManager? = null
     private var overlayView: TextView? = null
 
@@ -85,6 +91,9 @@ class ScreenFeedbackService : Service() {
         adapterState = AdapterRuntimeState()
         previousGrid = null
         sampleCount = 0L
+        lastOcrAtMs = 0L
+        ocrWeaponNext = false
+        lastHudValue.clear()
         captureStartedAtMs = System.currentTimeMillis()
         lastFlushAtMs = captureStartedAtMs
         beginDurableSession()
@@ -154,6 +163,8 @@ class ScreenFeedbackService : Service() {
         if (normalized.isNotEmpty()) pendingEvents += normalized
         if (now - lastFlushAtMs >= 1500L || pendingEvents.size >= 12) flushPendingEvents()
 
+        maybeRunHudOcr(image, width, height, output.qualityConfidence, now)
+
         capturePrefs().edit()
             .putFloat("brightness", frame.overall.brightness.toFloat())
             .putFloat("motion", frame.overall.motion.toFloat())
@@ -171,6 +182,83 @@ class ScreenFeedbackService : Service() {
             updateOverlay(output.tip)
             lastNotificationAtMs = now
         }
+    }
+
+    private fun maybeRunHudOcr(image: Image, width: Int, height: Int, quality: Double, now: Long) {
+        if (now - lastOcrAtMs < OCR_INTERVAL_MS) return
+        val field = if (ocrWeaponNext) "weapon_level" else "credits"
+        val roi = if (ocrWeaponNext) profile.weaponHud else profile.creditHud
+        val bitmap = cropRoiBitmap(image, width, height, roi) ?: return
+        val accepted = textExtractor.recognize(field, bitmap, quality) { estimate ->
+            if (estimate != null) handler?.post { handleHudEstimate(estimate) }
+        }
+        if (accepted) {
+            lastOcrAtMs = now
+            ocrWeaponNext = !ocrWeaponNext
+        }
+    }
+
+    private fun handleHudEstimate(estimate: HudTextEstimate) {
+        val previous = lastHudValue[estimate.field]
+        val prefEdit = capturePrefs().edit()
+        when (estimate.field) {
+            "credits" -> prefEdit
+                .putString("visibleCreditsEstimate", estimate.value)
+                .putFloat("visibleCreditsConfidence", estimate.confidence.toFloat())
+            "weapon_level" -> prefEdit
+                .putString("visibleWeaponLevelEstimate", estimate.value)
+                .putFloat("visibleWeaponLevelConfidence", estimate.confidence.toFloat())
+        }
+        prefEdit.apply()
+        if (previous == estimate.value) return
+        lastHudValue[estimate.field] = estimate.value
+
+        val type = if (estimate.field == "credits") "visible_credit_value_estimate" else "visible_weapon_level_estimate"
+        val label = if (estimate.field == "credits") "visible credit value" else "visible weapon/bet level"
+        pendingEvents += GameplayEvent(
+            type = type,
+            timestampMs = System.currentTimeMillis(),
+            note = "On-device OCR repeatedly observed $label '${estimate.value}' in the ${profile.displayName} HUD. Treat as a confidence-labelled visual estimate.",
+            evidence = EvidenceKind.DEVICE_SIGNAL,
+            confidence = estimate.confidence,
+            payload = mapOf(
+                "provider" to providerId,
+                "providerName" to profile.displayName,
+                "field" to estimate.field,
+                "value" to estimate.value,
+                "stableFrames" to estimate.stableFrames.toString(),
+                "source" to "bundled_on_device_ocr"
+            )
+        )
+        flushPendingEvents()
+    }
+
+    private fun cropRoiBitmap(image: Image, width: Int, height: Int, roi: NormalizedRoi): Bitmap? {
+        val plane = image.planes.firstOrNull() ?: return null
+        val buffer = plane.buffer
+        val pixelStride = plane.pixelStride
+        val rowStride = plane.rowStride
+        if (pixelStride < 3 || rowStride <= 0) return null
+        val x0 = (roi.left * width).toInt().coerceIn(0, width - 1)
+        val x1 = (roi.right * width).toInt().coerceIn(x0 + 1, width)
+        val y0 = (roi.top * height).toInt().coerceIn(0, height - 1)
+        val y1 = (roi.bottom * height).toInt().coerceIn(y0 + 1, height)
+        val outW = x1 - x0
+        val outH = y1 - y0
+        if (outW < 24 || outH < 16) return null
+        val pixels = IntArray(outW * outH)
+        var out = 0
+        for (y in y0 until y1) {
+            for (x in x0 until x1) {
+                val offset = y * rowStride + x * pixelStride
+                if (offset < 0 || offset + 2 >= buffer.limit()) return null
+                val r = buffer.get(offset).toInt() and 0xff
+                val g = buffer.get(offset + 1).toInt() and 0xff
+                val b = buffer.get(offset + 2).toInt() and 0xff
+                pixels[out++] = Color.rgb(r, g, b)
+            }
+        }
+        return Bitmap.createBitmap(pixels, outW, outH, Bitmap.Config.ARGB_8888)
     }
 
     private fun downsampleLuma(image: Image, width: Int, height: Int, gridW: Int, gridH: Int): FloatArray? {
@@ -252,7 +340,7 @@ class ScreenFeedbackService : Service() {
     }
 
     private fun updateOverlay(text: String) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || !Settings.canDrawOverlays(this)) return
+        if (!Settings.canDrawOverlays(this)) return
         val manager = overlayManager ?: (getSystemService(WINDOW_SERVICE) as WindowManager).also { overlayManager = it }
         val existing = overlayView
         if (existing != null) {
@@ -269,7 +357,7 @@ class ScreenFeedbackService : Service() {
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; y = 36 }
@@ -329,6 +417,7 @@ class ScreenFeedbackService : Service() {
     override fun onDestroy() {
         stopCapture()
         removeOverlay()
+        textExtractor.close()
         handlerThread?.quitSafely()
         handlerThread = null
         handler = null
@@ -345,5 +434,6 @@ class ScreenFeedbackService : Service() {
         private const val NOTIFICATION_ID = 4000
         private const val GRID_W = 32
         private const val GRID_H = 18
+        private const val OCR_INTERVAL_MS = 1800L
     }
 }
