@@ -1,6 +1,7 @@
 package com.egm4000.app
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -47,5 +48,18 @@ class ProviderVisualAdaptersTest {
         assertTrue(creditEvent != null)
         assertTrue(creditEvent!!.payload["credits"] == null)
         assertTrue(creditEvent.note.contains("Numeric credit value is intentionally not inferred"))
+    }
+
+    @Test
+    fun creditOcrParserNormalizesVisibleBalanceText() {
+        assertEquals("12500.50", ProviderTextExtractor.parseCreditCandidate("BALANCE $12,500.50"))
+        assertEquals("9876", ProviderTextExtractor.parseCreditCandidate("Credits 9,876"))
+    }
+
+    @Test
+    fun weaponOcrParserRequiresUsefulNumericShape() {
+        assertEquals("20", ProviderTextExtractor.parseWeaponCandidate("CANNON x20"))
+        assertEquals("7", ProviderTextExtractor.parseWeaponCandidate("Level: 7"))
+        assertNull(ProviderTextExtractor.parseWeaponCandidate("READY FIRE GO"))
     }
 }
