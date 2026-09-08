@@ -35,6 +35,10 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
+      - name: Run provider intelligence unit tests
+        working-directory: android-egm4000
+        run: gradle :app:testDebugUnitTest --stacktrace
+
       - name: Build installable debug APK
         working-directory: android-egm4000
         run: gradle :app:assembleDebug --stacktrace
