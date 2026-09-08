@@ -32,8 +32,20 @@ data class GameplaySession(
 )
 
 data class SessionMetrics(
-    val events: Int, val shots: Int, val creditIn: Int, val creditOut: Int, val netCredits: Int,
-    val durationMinutes: Double, val shotsPerMinute: Double, val estimatedSignals: Int, val exactSignals: Int
+    val events: Int,
+    val shots: Int,
+    val creditIn: Int,
+    val creditOut: Int,
+    val netCredits: Int,
+    val durationMinutes: Double,
+    val shotsPerMinute: Double,
+    val estimatedSignals: Int,
+    val exactSignals: Int,
+    val estimatedShotBursts: Int = 0,
+    val targetActivityEvents: Int = 0,
+    val transitionEvents: Int = 0,
+    val creditHudChanges: Int = 0,
+    val weaponHudChanges: Int = 0
 )
 
 fun GameplaySession.metrics(nowMs: Long = System.currentTimeMillis()): SessionMetrics {
@@ -41,9 +53,22 @@ fun GameplaySession.metrics(nowMs: Long = System.currentTimeMillis()): SessionMe
     val shots = events.count { it.type == "shot" || it.type == "shot_fired" }
     val creditIn = events.sumOf { if (it.creditDelta > 0) it.creditDelta else 0 }
     val creditOut = -events.sumOf { if (it.creditDelta < 0) it.creditDelta else 0 }
-    return SessionMetrics(events.size, shots, creditIn, creditOut, creditIn - creditOut, minutes, shots / minutes,
-        events.count { it.evidence == EvidenceKind.ESTIMATE || it.evidence == EvidenceKind.DEVICE_SIGNAL },
-        events.count { it.evidence == EvidenceKind.EXACT_TELEMETRY })
+    return SessionMetrics(
+        events = events.size,
+        shots = shots,
+        creditIn = creditIn,
+        creditOut = creditOut,
+        netCredits = creditIn - creditOut,
+        durationMinutes = minutes,
+        shotsPerMinute = shots / minutes,
+        estimatedSignals = events.count { it.evidence == EvidenceKind.ESTIMATE || it.evidence == EvidenceKind.DEVICE_SIGNAL },
+        exactSignals = events.count { it.evidence == EvidenceKind.EXACT_TELEMETRY },
+        estimatedShotBursts = events.count { it.type == "shot_activity_estimate" },
+        targetActivityEvents = events.count { it.type == "target_activity_estimate" },
+        transitionEvents = events.count { it.type == "bonus_or_round_transition_estimate" },
+        creditHudChanges = events.count { it.type == "credit_hud_changed" },
+        weaponHudChanges = events.count { it.type == "weapon_hud_changed" }
+    )
 }
 
 fun GameplaySession.riskFlags(maxMinutes: Int = 45, maxDrawdown: Int = 250, maxShots: Int = 500): List<String> {
@@ -52,6 +77,7 @@ fun GameplaySession.riskFlags(maxMinutes: Int = 45, maxDrawdown: Int = 250, maxS
         if (m.netCredits <= -maxDrawdown) add("Recorded credit drawdown reached ${-m.netCredits} credits. Stop and review before continuing.")
         if (m.shots >= maxShots) add("Recorded shot count reached ${m.shots}. Slow down and review pace.")
         if (m.shotsPerMinute > 60 && m.netCredits < 0) add("Shot pace is high while recorded net credits are negative. This is a review signal, not a prediction.")
+        if (m.estimatedShotBursts >= 45 && m.targetActivityEvents < 5) add("Observed input activity is high relative to detected target-field activity. Consider slowing down and comparing a controlled segment.")
     }
 }
 
@@ -59,7 +85,12 @@ fun GameplaySession.coachingTips(): List<String> {
     val m = metrics(); return buildList {
         if (events.isEmpty()) add("Record a few events or authorize capture signals to unlock evidence-based feedback.")
         if (m.netCredits < 0) add("Recorded credits are down ${-m.netCredits}. Compare the last high-spend segment with your earlier pace before continuing.")
-        if (m.shotsPerMinute > 45) add("Your recorded shot pace is ${"%.1f".format(m.shotsPerMinute)}/min. Try a slower interval and compare outcomes rather than chasing losses.")
+        if (m.shotsPerMinute > 45) add("Your recorded manual shot pace is ${"%.1f".format(m.shotsPerMinute)}/min. Try a slower interval and compare outcomes rather than chasing losses.")
+        if (m.estimatedShotBursts > 0) add("Provider-aware capture detected ${m.estimatedShotBursts} estimated input/shot burst(s). These are visual observations, not exact server telemetry.")
+        if (m.targetActivityEvents > 0) add("${m.targetActivityEvents} target-field activity event(s) were observed. Compare activity windows with your pacing, but do not treat activity as a payout predictor.")
+        if (m.transitionEvents > 0) add("${m.transitionEvents} possible bonus/round transition(s) were observed. Review before/after segments rather than assuming the transition predicts the next result.")
+        if (m.creditHudChanges > 0) add("The visible credit-HUD region changed ${m.creditHudChanges} time(s). Numeric credit values are not inferred unless separately validated; pair these observations with recorded credit events when possible.")
+        if (m.weaponHudChanges > 0) add("The weapon-control HUD changed ${m.weaponHudChanges} time(s). Treat this as a visual state-change signal unless the exact level is independently confirmed.")
         if (events.any { it.type == "break" }) add("A break was recorded. Compare metrics before and after the break instead of assuming a causal effect.")
         if (m.estimatedSignals > 0) add("${m.estimatedSignals} signal(s) are estimates/device observations. Treat them as lower-confidence than exact F.S.A. telemetry.")
         if (m.exactSignals > 0) add("${m.exactSignals} event(s) came from exact owned-environment telemetry and can be used as ground truth in validation.")
