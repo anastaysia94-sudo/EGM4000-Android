@@ -40,5 +40,10 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("org.json:json:20250517")
+
+    // Bundled Latin OCR works on-device immediately after install, avoiding a
+    // first-use model download on slow/2G connections.
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+
     testImplementation("junit:junit:4.13.2")
 }
