@@ -3,6 +3,7 @@ package com.egm4000.app
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,10 +27,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
-/**
- * Provider connection is an external-login handoff. EGM4000 never asks for,
- * receives, proxies, injects, inspects, or stores third-party credentials.
- */
 data class ExternalGameProvider(
     val id: String,
     val displayName: String,
@@ -69,6 +66,7 @@ fun ProviderConnectScreen(onStartCapture: () -> Unit) {
     var confidence by remember { mutableStateOf(0f) }
     var latestEvent by remember { mutableStateOf("") }
     var latestTip by remember { mutableStateOf("Start authorized Live Capture to activate provider-aware coaching.") }
+    var overlayAllowed by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
 
     LaunchedEffect(selectedId) {
         providerPrefs.edit().putString("selected_provider_id", selectedId).apply()
@@ -84,6 +82,7 @@ fun ProviderConnectScreen(onStartCapture: () -> Unit) {
             confidence = capturePrefs.getFloat("confidence", 0f)
             latestEvent = capturePrefs.getString("latestEventType", "").orEmpty()
             latestTip = capturePrefs.getString("latestTip", latestTip) ?: latestTip
+            overlayAllowed = Settings.canDrawOverlays(context)
             delay(750)
         }
     }
@@ -99,9 +98,14 @@ fun ProviderConnectScreen(onStartCapture: () -> Unit) {
         runCatching {
             context.startActivity(Intent(Intent.ACTION_VIEW, uri))
             status = "${selected.displayName} opened externally. Sign in there, return to EGM4000, then authorize Live Capture."
-        }.onFailure {
-            status = "Could not open that player URL on this device."
-        }
+        }.onFailure { status = "Could not open that player URL on this device." }
+    }
+
+    fun requestOverlayPermission() {
+        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
+        runCatching { context.startActivity(intent) }
+            .onSuccess { status = "Android opened the floating-window permission page. Enable it only if you want EGM4000 coaching tips over the foreground game." }
+            .onFailure { status = "Could not open Android's floating-window permission page on this device." }
     }
 
     Page(
@@ -114,12 +118,7 @@ fun ProviderConnectScreen(onStartCapture: () -> Unit) {
                 externalGameProviders.chunked(2).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         row.forEach { provider ->
-                            FilterChip(
-                                selected = selectedId == provider.id,
-                                onClick = { selectedId = provider.id },
-                                label = { Text(provider.displayName) },
-                                modifier = Modifier.weight(1f)
-                            )
+                            FilterChip(selected = selectedId == provider.id, onClick = { selectedId = provider.id }, label = { Text(provider.displayName) }, modifier = Modifier.weight(1f))
                         }
                     }
                 }
@@ -128,47 +127,43 @@ fun ProviderConnectScreen(onStartCapture: () -> Unit) {
 
         Panel("2. Provider login") {
             Text(selected.note, color = Color(0xFF9DB7C4))
-            OutlinedTextField(
-                value = customUrl,
-                onValueChange = { customUrl = it },
-                label = { Text("Provider/player-issued HTTPS login URL") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Button(onClick = ::openProvider, modifier = Modifier.fillMaxWidth()) {
-                Text("Open ${selected.displayName} login")
-            }
+            OutlinedTextField(value = customUrl, onValueChange = { customUrl = it }, label = { Text("Provider/player-issued HTTPS login URL") }, modifier = Modifier.fillMaxWidth())
+            Button(onClick = ::openProvider, modifier = Modifier.fillMaxWidth()) { Text("Open ${selected.displayName} login") }
         }
 
         Panel("3. Authorized live capture") {
             Text("After provider login, return here. Android's system dialog controls what is shared; EGM4000 processes a coarse visual grid in memory and does not persist raw frames.")
-            OutlinedButton(
-                onClick = {
-                    providerPrefs.edit().putString("selected_provider_id", selectedId).apply()
-                    onStartCapture()
-                    status = "Android will ask what screen/app to share. Choose only the gameplay you want EGM4000 to observe."
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(if (captureActive) "Capture active — re-authorize" else "Start authorized Live Capture") }
+            OutlinedButton(onClick = {
+                providerPrefs.edit().putString("selected_provider_id", selectedId).apply()
+                onStartCapture()
+                status = "Android will ask what screen/app to share. Choose only the gameplay you want EGM4000 to observe."
+            }, modifier = Modifier.fillMaxWidth()) { Text(if (captureActive) "Capture active — re-authorize" else "Start authorized Live Capture") }
         }
 
-        Panel("4. Provider visual adapter") {
+        Panel("4. Optional floating live tips") {
+            Text(if (overlayAllowed) "Floating coaching permission: ENABLED" else "Floating coaching permission: OFF", color = if (overlayAllowed) Color(0xFF38FFC6) else Color(0xFFFFB84A))
+            Text("When enabled, EGM4000 can show a small non-touchable coaching strip above the foreground game. Android controls this permission and you can revoke it at any time.", color = Color(0xFF9DB7C4))
+            if (!overlayAllowed) OutlinedButton(onClick = ::requestOverlayPermission, modifier = Modifier.fillMaxWidth()) { Text("Enable floating live tips") }
+        }
+
+        Panel("5. Provider visual adapter") {
             Text("${selected.displayName} adapter • ${if (captureActive) "LIVE" else "STANDBY"}", color = if (captureActive) Color(0xFF38FFC6) else Color(0xFFFFB84A))
             Text("Capture confidence: ${"%.0f".format(confidence * 100)}%")
             Text("Screen change: ${"%.1f".format(motion * 100)}% • brightness: ${"%.1f".format(brightness * 100)}%")
             Text("Target-field activity: ${"%.1f".format(targetActivity * 100)}%")
             Text("Estimated input/shot bursts in rolling minute: ${"%.0f".format(shotRate)}")
             if (latestEvent.isNotBlank()) Text("Latest normalized event: $latestEvent", color = Color(0xFF9DB7C4))
-            Text("Credit and weapon HUD regions are monitored for visible change. Numeric credits/weapon levels are not fabricated when visual recognition is not sufficiently validated.", color = Color(0xFF9DB7C4))
+            Text("Credit and weapon HUD regions are monitored for visible change. Numeric credits/weapon levels are not fabricated when recognition is not sufficiently validated.", color = Color(0xFF9DB7C4))
         }
 
-        Panel("5. EGM4000 AI Coach — live tip") {
+        Panel("6. EGM4000 AI Coach — live tip") {
             Text(latestTip, color = Color(0xFF38FFC6))
-            Text("The same tip is mirrored into the persistent Android capture notification so feedback remains visible while the game is foregrounded.", color = Color(0xFF9DB7C4))
+            Text("Tips are mirrored to the persistent capture notification and, when separately authorized, to the floating coaching strip.", color = Color(0xFF9DB7C4))
         }
 
-        Panel("6. Session history + post-session analysis") {
+        Panel("7. Session history + post-session analysis") {
             Text("Authorized capture automatically creates a durable local ${selected.displayName} observation session. Confidence-labelled visual events are appended during capture and the session is closed when capture stops.")
-            Text("Open Event Stream, Metrics, Pattern Lab, AI Coach or Replay Lab after the session to review normalized observations alongside your recorded history.", color = Color(0xFF9DB7C4))
+            Text("Open Event Stream, Metrics, Pattern Lab, AI Coach or Replay Lab after the session to review normalized observations alongside recorded history.", color = Color(0xFF9DB7C4))
         }
 
         Panel("Evidence boundary") {
