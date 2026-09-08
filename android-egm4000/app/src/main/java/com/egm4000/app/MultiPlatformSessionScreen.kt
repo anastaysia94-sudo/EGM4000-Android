@@ -21,6 +21,8 @@ import com.egm4000.app.data.AdaptiveGameplayIntelligence
 import com.egm4000.app.data.EvidenceKind
 import com.egm4000.app.data.GameplayEvent
 import com.egm4000.app.data.GameplaySession
+import com.egm4000.app.data.metrics
+import com.egm4000.app.data.riskFlags
 
 @Composable
 fun MultiPlatformSessionScreen(
@@ -29,18 +31,21 @@ fun MultiPlatformSessionScreen(
     storageStatus: String
 ) {
     val currentActive = sessions.lastOrNull { it.endedAtMs == null }
-    var platform by remember { mutableStateOf(currentActive?.platform ?: "F.S.A.") }
+    var platform by remember(currentActive?.id) { mutableStateOf(currentActive?.platform ?: "F.S.A.") }
     var note by remember { mutableStateOf("") }
+
+    fun replaceSession(updated: GameplaySession): List<GameplaySession> =
+        sessions.map { if (it.id == updated.id) updated else it }
 
     fun startSession() {
         if (currentActive != null) return
-        val exact = platform == "F.S.A."
+        val isFsa = platform == "F.S.A."
         persist(
             sessions + GameplaySession(
                 platform = platform,
                 title = "$platform session",
-                notes = if (exact)
-                    "F.S.A. session. Owned-environment telemetry may be recorded as exact when supplied by the F.S.A. integration."
+                notes = if (isFsa)
+                    "F.S.A. session. Owned-environment telemetry may be recorded as exact only when supplied by the F.S.A. telemetry integration."
                 else
                     "$platform session. Third-party observations remain confidence-labelled and separate from hidden provider state."
             )
@@ -50,17 +55,16 @@ fun MultiPlatformSessionScreen(
     fun addEvent(type: String, delta: Int = 0) {
         val active = sessions.lastOrNull { it.endedAtMs == null }
         val session = active ?: GameplaySession(platform = platform, title = "$platform session")
-        val evidence = if (session.platform == "F.S.A.") EvidenceKind.USER_RECORDED else EvidenceKind.USER_RECORDED
         val event = GameplayEvent(
             type = type,
             creditDelta = delta,
             note = note.trim(),
-            evidence = evidence,
+            evidence = EvidenceKind.USER_RECORDED,
             confidence = 1.0,
             payload = mapOf("platform" to session.platform, "source" to "manual_session_logger")
         )
         val updated = session.copy(events = session.events + event)
-        persist(if (active == null) sessions + updated else sessions.dropLast(1) + updated)
+        persist(if (active == null) sessions + updated else replaceSession(updated))
         note = ""
     }
 
@@ -124,7 +128,7 @@ fun MultiPlatformSessionScreen(
         currentActive?.let { active ->
             Button(
                 onClick = {
-                    persist(sessions.dropLast(1) + active.copy(endedAtMs = System.currentTimeMillis()))
+                    persist(replaceSession(active.copy(endedAtMs = System.currentTimeMillis())))
                 },
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Finish + save session") }
@@ -132,11 +136,11 @@ fun MultiPlatformSessionScreen(
 
         val latest = sessions.lastOrNull()
         latest?.let { session ->
-            val metrics = session.metrics()
+            val sessionMetrics = session.metrics()
             Panel("Latest learning sample") {
-                Text("${session.platform} • ${metrics.events} events • ${metrics.shots} shots • ${metrics.netCredits} recorded net credits • ${"%.1f".format(metrics.durationMinutes)} min")
+                Text("${session.platform} • ${sessionMetrics.events} events • ${sessionMetrics.shots} shots • ${sessionMetrics.netCredits} recorded net credits • ${"%.1f".format(sessionMetrics.durationMinutes)} min")
                 Text("After the session is closed, the adaptive model automatically includes it in future baselines and forecasts.", color = Color(0xFF38FFC6))
-                session.riskFlags().forEach { Text("⚠ $it", color = Color(0xFFFFB84A)) }
+                session.riskFlags().forEach { flag -> Text("⚠ $flag", color = Color(0xFFFFB84A)) }
             }
         }
 
