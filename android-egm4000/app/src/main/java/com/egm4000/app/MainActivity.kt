@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.egm4000.app.data.GameplaySession
 import com.egm4000.app.data.LocalSessionStore
+import kotlinx.coroutines.delay
 
 const val FIRE_KIRIN_URL = "https://play.firekirin.xyz/web_game/firekirin777_pc/index.html"
 
@@ -68,28 +69,33 @@ fun EGM4000App() {
     val appPrefs = remember { context.getSharedPreferences("egm4000_app_v1", Context.MODE_PRIVATE) }
     val initialScreen = if (appPrefs.getBoolean("tutorial_complete", false)) Screen.COMMAND else Screen.TUTORIAL
     var state by remember {
-        mutableStateOf(
-            EGMState(
-                sessions = store.loadSessions(),
-                screen = initialScreen,
-                storageStatus = store.storageStatus()
-            )
-        )
+        mutableStateOf(EGMState(sessions = store.loadSessions(), screen = initialScreen, storageStatus = store.storageStatus()))
     }
     var message by remember { mutableStateOf<String?>(null) }
 
-    fun navigate(next: Screen) {
-        state = state.copy(screen = next)
+    LaunchedEffect(Unit) {
+        while (true) {
+            val loaded = store.loadSessions()
+            val changed = loaded.size != state.sessions.size || loaded.zip(state.sessions).any { (a, b) ->
+                a.id != b.id || a.events.size != b.events.size || a.endedAtMs != b.endedAtMs
+            }
+            if (changed) {
+                state = state.copy(
+                    sessions = loaded,
+                    selectedSessionId = loaded.lastOrNull()?.id ?: state.selectedSessionId,
+                    storageStatus = store.storageStatus()
+                )
+            }
+            delay(1500)
+        }
     }
+
+    fun navigate(next: Screen) { state = state.copy(screen = next) }
 
     fun persist(next: List<GameplaySession>) {
         val ok = store.saveSessions(next)
         val loaded = if (ok) store.loadSessions() else next
-        state = state.copy(
-            sessions = loaded,
-            selectedSessionId = loaded.lastOrNull()?.id,
-            storageStatus = store.storageStatus()
-        )
+        state = state.copy(sessions = loaded, selectedSessionId = loaded.lastOrNull()?.id, storageStatus = store.storageStatus())
         message = if (ok) "Session data saved and verified on disk." else store.storageStatus()
     }
 
@@ -100,9 +106,7 @@ fun EGM4000App() {
                 .putExtra(ScreenFeedbackService.EXTRA_RESULT_DATA, result.data)
             context.startForegroundService(svc)
             message = "Authorized screen feedback started. Aggregate signals only; raw frames are not saved."
-        } else {
-            message = "Screen feedback was not authorized."
-        }
+        } else message = "Screen feedback was not authorized."
     }
 
     fun startCapture() {
@@ -115,9 +119,7 @@ fun EGM4000App() {
         message = "Screen feedback stopped."
     }
 
-    fun openFireKirin() {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(FIRE_KIRIN_URL)))
-    }
+    fun openFireKirin() { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(FIRE_KIRIN_URL))) }
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -125,35 +127,21 @@ fun EGM4000App() {
             Column(Modifier.background(Color(0xEE071219)).padding(horizontal = 12.dp, vertical = 8.dp)) {
                 Text("EGM4000 // EduGameMaster 4000", color = Color(0xFF00F2FF), fontWeight = FontWeight.Black)
                 Text("Watch. Measure. Explain. Improve.  •  SV09 Full Intelligence Beta", style = MaterialTheme.typography.bodySmall, color = Color(0xFF8BA3AD))
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Screen.entries.forEach { s ->
-                        FilterChip(
-                            selected = state.screen == s,
-                            onClick = { navigate(s) },
-                            label = { Text(s.label) }
-                        )
+                        FilterChip(selected = state.screen == s, onClick = { navigate(s) }, label = { Text(s.label) })
                     }
                 }
             }
         }
     ) { pad ->
-        Box(
-            Modifier.fillMaxSize().padding(pad).background(
-                Brush.verticalGradient(listOf(Color(0xFF06101A), Color(0xFF060B14), Color(0xFF0A1018)))
-            )
-        ) {
+        Box(Modifier.fillMaxSize().padding(pad).background(Brush.verticalGradient(listOf(Color(0xFF06101A), Color(0xFF060B14), Color(0xFF0A1018))))) {
             when (state.screen) {
-                Screen.TUTORIAL -> TutorialScreen(
-                    onComplete = {
-                        appPrefs.edit().putBoolean("tutorial_complete", true).commit()
-                        message = "Tutorial complete. EGM4000 is ready."
-                        navigate(Screen.COMMAND)
-                    },
-                    onNavigate = ::navigate
-                )
+                Screen.TUTORIAL -> TutorialScreen(onComplete = {
+                    appPrefs.edit().putBoolean("tutorial_complete", true).commit()
+                    message = "Tutorial complete. EGM4000 is ready."
+                    navigate(Screen.COMMAND)
+                }, onNavigate = ::navigate)
                 Screen.COMMAND -> CommandCenterScreen(state, onNavigate = ::navigate, onOpenFireKirin = ::openFireKirin)
                 Screen.SESSION -> SessionScreen(state.sessions, ::persist, state.storageStatus)
                 Screen.CAPTURE -> CaptureScreen(onStart = ::startCapture, onStop = ::stopCapture)
@@ -190,9 +178,7 @@ fun EGM4000App() {
                 Screen.PROVIDERS -> ProviderConnectScreen(onStartCapture = ::startCapture)
                 Screen.FIRE_KIRIN -> FireKirinScreen(onOpen = ::openFireKirin, onCapture = ::startCapture, sessions = state.sessions)
             }
-            message?.let {
-                Snackbar(Modifier.padding(16.dp).align(androidx.compose.ui.Alignment.BottomCenter)) { Text(it) }
-            }
+            message?.let { Snackbar(Modifier.padding(16.dp).align(androidx.compose.ui.Alignment.BottomCenter)) { Text(it) } }
         }
     }
 }
