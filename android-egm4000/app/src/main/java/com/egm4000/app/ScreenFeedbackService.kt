@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
@@ -17,6 +18,10 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
+import android.provider.Settings
+import android.view.Gravity
+import android.view.WindowManager
+import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import com.egm4000.app.data.EvidenceKind
 import com.egm4000.app.data.GameplayEvent
@@ -24,14 +29,6 @@ import com.egm4000.app.data.GameplaySession
 import com.egm4000.app.data.LocalSessionStore
 import kotlin.math.abs
 
-/**
- * User-authorized, local-first screen observation service.
- *
- * Raw frames are never persisted. Frames are downsampled in memory into coarse
- * luminance grids, interpreted through a provider-specific adapter, normalized
- * into confidence-labelled EGM4000 events, and appended to durable local
- * session history. No provider credentials or hidden server state are accessed.
- */
 class ScreenFeedbackService : Service() {
     private var projection: MediaProjection? = null
     private var imageReader: ImageReader? = null
@@ -51,6 +48,9 @@ class ScreenFeedbackService : Service() {
     private var lastFlushAtMs = 0L
     private var lastNotificationAtMs = 0L
 
+    private var overlayManager: WindowManager? = null
+    private var overlayView: TextView? = null
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -65,19 +65,13 @@ class ScreenFeedbackService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-
-        val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
-            ?: Activity.RESULT_CANCELED
+        val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED) ?: Activity.RESULT_CANCELED
         val resultData: Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent?.getParcelableExtra(EXTRA_RESULT_DATA, Intent::class.java)
         } else {
-            @Suppress("DEPRECATION")
-            intent?.getParcelableExtra(EXTRA_RESULT_DATA)
+            @Suppress("DEPRECATION") intent?.getParcelableExtra(EXTRA_RESULT_DATA)
         }
-
-        if (resultCode == Activity.RESULT_OK && resultData != null && projection == null) {
-            startCapture(resultCode, resultData)
-        }
+        if (resultCode == Activity.RESULT_OK && resultData != null && projection == null) startCapture(resultCode, resultData)
         return START_STICKY
     }
 
@@ -86,8 +80,7 @@ class ScreenFeedbackService : Service() {
         val mediaProjection = manager.getMediaProjection(resultCode, resultData) ?: return
         projection = mediaProjection
 
-        providerId = getSharedPreferences("egm4000_provider", MODE_PRIVATE)
-            .getString("selected_provider_id", "fire_kirin") ?: "fire_kirin"
+        providerId = getSharedPreferences("egm4000_provider", MODE_PRIVATE).getString("selected_provider_id", "fire_kirin") ?: "fire_kirin"
         profile = ProviderVisualAdapters.profile(providerId)
         adapterState = AdapterRuntimeState()
         previousGrid = null
@@ -100,23 +93,14 @@ class ScreenFeedbackService : Service() {
         val width = metrics.widthPixels.coerceAtLeast(1)
         val height = metrics.heightPixels.coerceAtLeast(1)
         val density = metrics.densityDpi.coerceAtLeast(1)
-
         val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
         imageReader = reader
-
-        val listener = ImageReader.OnImageAvailableListener { availableReader ->
+        reader.setOnImageAvailableListener({ availableReader ->
             val image = availableReader.acquireLatestImage()
             if (image != null) {
-                try {
-                    processImage(image, width, height)
-                } catch (_: Throwable) {
-                    // Transition/malformed frames are ignored; raw frames are never persisted.
-                } finally {
-                    image.close()
-                }
+                try { processImage(image, width, height) } catch (_: Throwable) { } finally { image.close() }
             }
-        }
-        reader.setOnImageAvailableListener(listener, handler)
+        }, handler)
 
         mediaProjection.registerCallback(object : MediaProjection.Callback() {
             override fun onStop() {
@@ -128,16 +112,9 @@ class ScreenFeedbackService : Service() {
         }, handler)
 
         virtualDisplay = mediaProjection.createVirtualDisplay(
-            "EGM4000Feedback",
-            width,
-            height,
-            density,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            reader.surface,
-            null,
-            handler
+            "EGM4000Feedback", width, height, density,
+            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, reader.surface, null, handler
         )
-
         capturePrefs().edit()
             .putBoolean("active", true)
             .putString("providerId", providerId)
@@ -145,15 +122,15 @@ class ScreenFeedbackService : Service() {
             .putLong("startedAtMs", captureStartedAtMs)
             .apply()
         updateNotification("${profile.displayName}: authorized capture active")
+        updateOverlay("${profile.displayName} • EGM4000 live intelligence active")
     }
 
     private fun processImage(image: Image, width: Int, height: Int) {
         val grid = downsampleLuma(image, width, height, GRID_W, GRID_H) ?: return
         val prior = previousGrid
         val now = System.currentTimeMillis()
-        val overall = observeRegion(grid, prior, NormalizedRoi(0.0, 0.0, 1.0, 1.0))
         val frame = VisualFrameObservations(
-            overall = overall,
+            overall = observeRegion(grid, prior, NormalizedRoi(0.0, 0.0, 1.0, 1.0)),
             credit = observeRegion(grid, prior, profile.creditHud),
             weapon = observeRegion(grid, prior, profile.weaponHud),
             target = observeRegion(grid, prior, profile.targetField),
@@ -171,11 +148,7 @@ class ScreenFeedbackService : Service() {
                 note = event.note,
                 evidence = EvidenceKind.DEVICE_SIGNAL,
                 confidence = event.confidence,
-                payload = event.payload + mapOf(
-                    "provider" to providerId,
-                    "providerName" to profile.displayName,
-                    "source" to "authorized_screen_capture"
-                )
+                payload = event.payload + mapOf("provider" to providerId, "providerName" to profile.displayName, "source" to "authorized_screen_capture")
             )
         }
         if (normalized.isNotEmpty()) pendingEvents += normalized
@@ -195,6 +168,7 @@ class ScreenFeedbackService : Service() {
 
         if (now - lastNotificationAtMs >= 2000L) {
             updateNotification(output.tip)
+            updateOverlay(output.tip)
             lastNotificationAtMs = now
         }
     }
@@ -230,29 +204,25 @@ class ScreenFeedbackService : Service() {
         var brightness = 0.0
         var motion = 0.0
         var count = 0
-        for (y in y0 until y1) {
-            for (x in x0 until x1) {
-                val i = y * GRID_W + x
-                val value = current[i].toDouble()
-                brightness += value
-                if (prior != null && i < prior.size) motion += abs(value - prior[i].toDouble())
-                count++
-            }
+        for (y in y0 until y1) for (x in x0 until x1) {
+            val i = y * GRID_W + x
+            val value = current[i].toDouble()
+            brightness += value
+            if (prior != null && i < prior.size) motion += abs(value - prior[i].toDouble())
+            count++
         }
-        if (count == 0) return RegionObservation(0.0, 0.0)
-        return RegionObservation(brightness / count, motion / count)
+        return if (count == 0) RegionObservation(0.0, 0.0) else RegionObservation(brightness / count, motion / count)
     }
 
     private fun beginDurableSession() {
         val store = LocalSessionStore(applicationContext)
-        val existing = store.loadSessions()
         val session = GameplaySession(
             platform = profile.displayName,
             startedAtMs = captureStartedAtMs,
             title = "${profile.displayName} authorized live observation",
-            notes = "Created automatically from user-authorized screen capture. Visual events are confidence-labelled observations, not hidden provider telemetry."
+            notes = "Created from user-authorized screen capture. Visual events are confidence-labelled observations, not hidden provider telemetry."
         )
-        if (store.saveSessions(existing + session)) activeSessionId = session.id
+        if (store.saveSessions(store.loadSessions() + session)) activeSessionId = session.id
     }
 
     private fun flushPendingEvents() {
@@ -263,8 +233,7 @@ class ScreenFeedbackService : Service() {
         val index = sessions.indexOfFirst { it.id == id }
         if (index < 0) return
         val session = sessions[index]
-        val batch = pendingEvents.toList()
-        sessions[index] = session.copy(events = session.events + batch)
+        sessions[index] = session.copy(events = session.events + pendingEvents.toList())
         if (store.saveSessions(sessions)) pendingEvents.clear()
         lastFlushAtMs = System.currentTimeMillis()
     }
@@ -276,11 +245,42 @@ class ScreenFeedbackService : Service() {
         val sessions = store.loadSessions().toMutableList()
         val index = sessions.indexOfFirst { it.id == id }
         if (index >= 0) {
-            val session = sessions[index]
-            sessions[index] = session.copy(endedAtMs = System.currentTimeMillis())
+            sessions[index] = sessions[index].copy(endedAtMs = System.currentTimeMillis())
             store.saveSessions(sessions)
         }
         activeSessionId = null
+    }
+
+    private fun updateOverlay(text: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || !Settings.canDrawOverlays(this)) return
+        val manager = overlayManager ?: (getSystemService(WINDOW_SERVICE) as WindowManager).also { overlayManager = it }
+        val existing = overlayView
+        if (existing != null) {
+            existing.post { existing.text = "EGM4000 • ${text.take(180)}" }
+            return
+        }
+        val view = TextView(this).apply {
+            this.text = "EGM4000 • ${text.take(180)}"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.argb(220, 5, 24, 34))
+            textSize = 13f
+            setPadding(22, 14, 22, 14)
+        }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; y = 36 }
+        runCatching { manager.addView(view, params); overlayView = view }
+    }
+
+    private fun removeOverlay() {
+        val view = overlayView ?: return
+        runCatching { overlayManager?.removeView(view) }
+        overlayView = null
+        overlayManager = null
     }
 
     private fun capturePrefs() = getSharedPreferences("egm4000_capture_signals", MODE_PRIVATE)
@@ -300,6 +300,7 @@ class ScreenFeedbackService : Service() {
         if (stopProjection) runCatching { p?.stop() }
         previousGrid = null
         pendingEvents.clear()
+        removeOverlay()
         updateNotification("Capture stopped")
         stopping = false
     }
@@ -319,8 +320,7 @@ class ScreenFeedbackService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(
+            getSystemService(NotificationManager::class.java).createNotificationChannel(
                 NotificationChannel(CHANNEL_ID, "EGM4000 screen feedback", NotificationManager.IMPORTANCE_LOW)
             )
         }
@@ -328,6 +328,7 @@ class ScreenFeedbackService : Service() {
 
     override fun onDestroy() {
         stopCapture()
+        removeOverlay()
         handlerThread?.quitSafely()
         handlerThread = null
         handler = null
