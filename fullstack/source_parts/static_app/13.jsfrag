@@ -1,0 +1,29 @@
+// C008 A092 optional support links. Voluntary support is never framed as gameplay advantage.
+const _c008SupportTodayBase=today;
+today=async function(){
+  await _c008SupportTodayBase();
+  try{
+    const data=await api('/api/support-links');
+    if(!data.links.length)return;
+    const grid=document.querySelector('.content .grid');if(!grid)return;
+    const links=data.links.map(x=>`<div class="event"><div class="topline"><b>${esc(x.title)}</b><span class="pill">Optional support</span></div><p>${esc(x.body||'')}</p><p class="muted">${esc(x.disclosure)}</p><a class="button" href="${esc(x.supportPath)}" target="_blank" rel="noopener noreferrer">Open support link ↗</a></div>`).join('');
+    grid.insertAdjacentHTML('beforeend',`<div class="card span12"><div class="tag">A092 · Voluntary Support</div><h2>Support EGM4000, if you genuinely want to</h2><p class="muted">${esc(data.boundary)}</p>${links}</div>`);
+  }catch(e){console.warn('support links unavailable',e)}
+};
+
+const _c008SupportAdminBase=admin;
+admin=async function(){
+  await _c008SupportAdminBase();
+  if(!S.me||S.me.role!=='owner')return;
+  try{
+    const data=await api('/api/admin/support-links');
+    const grid=document.querySelector('.content .grid');if(!grid)return;
+    const rows=data.links.length?data.links.map(x=>`<div class="event c008-support-row" data-json="${esc(encodeURIComponent(JSON.stringify(x)))}"><div class="topline"><b>${esc(x.title)}</b><span class="pill ${x.active?'good':''}">${x.active?'active':'archived'} · ${esc(x.clicks)} clicks</span></div><p class="muted">${esc(x.disclosure)}</p><div class="actions"><button class="c008-support-edit">Edit</button>${x.active?'<button class="c008-support-archive">Archive</button>':''}</div></div>`).join(''):'<p class="muted">No support links configured.</p>';
+    grid.insertAdjacentHTML('beforeend',`<div class="card span12" id="c008SupportAdmin"><div class="tag">C008 · A092 Optional Tip-Jar / Donation Support</div><h2>Voluntary support links</h2><p class="muted">${esc(data.measurementBoundary)}</p><div class="grid"><div class="card span5"><input id="c008SupportId" type="hidden"><label>Title</label><input id="c008SupportTitle" maxlength="180" placeholder="Support EGM4000"><label>Description</label><textarea id="c008SupportBody" maxlength="2500" placeholder="Explain what voluntary support helps fund"></textarea><label>HTTPS support destination</label><input id="c008SupportUrl" maxlength="1200" placeholder="https://…"><label>Disclosure</label><textarea id="c008SupportDisclosure" maxlength="500" placeholder="Leave blank for the safe default disclosure"></textarea><label class="pill"><input id="c008SupportActive" type="checkbox"> Active publicly</label><div class="actions"><button id="c008SupportSave" class="aqua">Save support link</button><button id="c008SupportClear">Clear</button></div></div><div class="card span7"><h3>Support link ledger</h3>${rows}</div></div></div>`);
+    const clear=()=>{document.querySelector('#c008SupportId').value='';document.querySelector('#c008SupportTitle').value='';document.querySelector('#c008SupportBody').value='';document.querySelector('#c008SupportUrl').value='';document.querySelector('#c008SupportDisclosure').value='';document.querySelector('#c008SupportActive').checked=false};
+    document.querySelector('#c008SupportClear').onclick=clear;
+    document.querySelector('#c008SupportSave').onclick=async()=>{const payload={id:document.querySelector('#c008SupportId').value||undefined,title:document.querySelector('#c008SupportTitle').value,body:document.querySelector('#c008SupportBody').value,destination_url:document.querySelector('#c008SupportUrl').value,disclosure:document.querySelector('#c008SupportDisclosure').value,active:document.querySelector('#c008SupportActive').checked};try{await post('/api/admin/support-link',payload);await admin()}catch(e){alert(e.message)}};
+    document.querySelectorAll('.c008-support-edit').forEach(btn=>btn.onclick=()=>{const x=JSON.parse(decodeURIComponent(btn.closest('.c008-support-row').dataset.json));document.querySelector('#c008SupportId').value=x.id;document.querySelector('#c008SupportTitle').value=x.title;document.querySelector('#c008SupportBody').value=x.body||'';document.querySelector('#c008SupportUrl').value=x.destinationUrl||'';document.querySelector('#c008SupportDisclosure').value=x.disclosure||'';document.querySelector('#c008SupportActive').checked=!!x.active;document.querySelector('#c008SupportAdmin').scrollIntoView({behavior:'smooth'})});
+    document.querySelectorAll('.c008-support-archive').forEach(btn=>btn.onclick=async()=>{const x=JSON.parse(decodeURIComponent(btn.closest('.c008-support-row').dataset.json));try{await post('/api/admin/support-link',{action:'archive',id:x.id});await admin()}catch(e){alert(e.message)}});
+  }catch(e){console.warn('support-link admin unavailable',e)}
+};
