@@ -44,8 +44,8 @@ jobs:
           rows=c.execute('SELECT id,title,category,implementation_status FROM admin_features ORDER BY id').fetchall()
           assert len(rows)==100
           statuses={s:sum(1 for r in rows if r[3]==s) for s in {'implemented','modelled','provider_configuration_required'}}
-          assert statuses=={'implemented':65,'modelled':10,'provider_configuration_required':25},statuses
-          for fid in ('A004','A008','A009','A027','A028','A034','A041','A042','A043','A044','A045','A058','A059','A060','A061','A062','A065','A098'):
+          assert statuses=={'implemented':71,'modelled':4,'provider_configuration_required':25},statuses
+          for fid in ('A004','A008','A009','A027','A028','A034','A035','A036','A037','A038','A039','A040','A041','A042','A043','A044','A045','A058','A059','A060','A061','A062','A065','A098'):
               assert c.execute('SELECT done FROM checklist WHERE id=?',(fid,)).fetchone()[0]==1,fid
           print('Admin 100 verified',statuses)
           PY
@@ -59,15 +59,8 @@ jobs:
           trap 'kill $pid 2>/dev/null || true' EXIT
           ready=0
           for i in $(seq 1 25); do
-            if curl -fsS http://127.0.0.1:8040/api/health | grep -q 'egm.event.v1'; then
-              ready=1
-              break
-            fi
-            if ! kill -0 "$pid" 2>/dev/null; then
-              echo "EGM4000 server exited before becoming ready" >&2
-              cat /tmp/egm4000.log >&2 || true
-              exit 1
-            fi
+            if curl -fsS http://127.0.0.1:8040/api/health | grep -q 'egm.event.v1'; then ready=1; break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then cat /tmp/egm4000.log >&2 || true; exit 1; fi
             sleep 1
           done
           test "$ready" -eq 1
@@ -78,7 +71,7 @@ jobs:
           curl -fsS -c /tmp/egm.cookies -H 'Content-Type: application/json' --data-binary @/tmp/login.json http://127.0.0.1:8040/api/login | grep -q '"ok": true'
           curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/me > /tmp/me.json
           CSRF=$(python -c "import json;print(json.load(open('/tmp/me.json'))['csrf'])")
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/features | grep -q 'F.S.A. duplicate-event diagnostics'
+          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/features | grep -q 'Editorial scheduling'
           curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/recovery-status | grep -q 'egm.admin.recovery-status.v1'
 
           curl -fsS -c /tmp/egm2.cookies -H 'Content-Type: application/json' --data-binary @/tmp/login.json http://127.0.0.1:8040/api/login | grep -q '"ok": true'
@@ -90,6 +83,23 @@ jobs:
           curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"action":"restore","targets":[{"target_type":"forum_thread","target_id":1}]}' http://127.0.0.1:8040/api/admin/bulk-moderate | grep -q '"count": 1'
           curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"target_type":"forum_thread","target_id":1,"note":"Smoke-test moderation note"}' http://127.0.0.1:8040/api/admin/moderator-note | grep -q '"ok": true'
           curl -fsS -b /tmp/egm.cookies 'http://127.0.0.1:8040/api/admin/moderator-notes?target_type=forum_thread&target_id=1' | grep -q 'Smoke-test moderation note'
+
+          # A035-A040 publishing controls.
+          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"kind":"category","name":"Research Notes"}' http://127.0.0.1:8040/api/admin/taxonomy | grep -q 'research-notes'
+          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"kind":"tag","name":"Evidence Review"}' http://127.0.0.1:8040/api/admin/taxonomy | grep -q 'evidence-review'
+          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/taxonomy | grep -q 'Research Notes'
+          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"settings":{"hero_title":"Evidence-first gameplay intelligence","community_callout":"Compare recorded sessions, not imagined streaks."}}' http://127.0.0.1:8040/api/admin/homepage | grep -q 'Evidence-first gameplay intelligence'
+          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"title":"System Notice","body":"Evidence review tools are available.","status":"published"}' http://127.0.0.1:8040/api/admin/announcement | grep -q '"status": "published"'
+          curl -fsS http://127.0.0.1:8040/api/content/navigation | grep -q 'System Notice'
+          curl -fsS -b /tmp/egm.cookies 'http://127.0.0.1:8040/api/admin/draft-preview?post_id=1' | grep -q 'egm.admin.draft-preview.v1'
+          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"post_id":1,"publish_at":"2026-01-01T00:00:00+00:00"}' http://127.0.0.1:8040/api/admin/schedule-post | grep -q '"status": "scheduled"'
+          curl -fsS http://127.0.0.1:8040/api/blog/posts > /tmp/posts.json
+          python - <<'PY'
+          import json
+          rows=json.load(open('/tmp/posts.json'))
+          assert any(int(x['id'])==1 for x in rows), rows
+          PY
+          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/editorial-schedule | grep -q '"status": "published"'
 
           cat > /tmp/fsa.json <<'JSON'
           {"userId":2,"sessionId":"smoke-session-1","eventId":"smoke-event-1","eventType":"shot_fired","occurredAt":"2026-09-13T12:00:00Z","sourceProduct":"fsa","evidenceLabel":"exact_telemetry","confidence":1,"payload":{}}
