@@ -30,6 +30,7 @@ jobs:
           python -m py_compile bootstrap_db.py storage.py live_intelligence.py admin_registry.py server.py
           python server.py
           node --check static/app.js
+          python test_return_features.py
       - name: Fresh database and Admin 100 integrity
         run: |
           rm -rf data
@@ -74,6 +75,9 @@ jobs:
           CSRF=$(python -c "import json;print(json.load(open('/tmp/me.json'))['csrf'])")
           curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/features | grep -q 'Owner multi-factor authentication'
           curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/recovery-status | grep -q 'egm.admin.recovery-status.v1'
+          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/return/dashboard | grep -q 'egm.return-dashboard.v1'
+          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"feature_id":"R001","event_name":"view","context":{"surface":"ci"}}' http://127.0.0.1:8040/api/return/event | grep -q '"ok": true'
+          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/return-adoption | grep -q 'egm.admin.return-adoption.v1'
 
           curl -fsS -c /tmp/egm2.cookies -H 'Content-Type: application/json' --data-binary @/tmp/login.json http://127.0.0.1:8040/api/login | grep -q '"ok": true'
           curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/sessions | grep -q 'egm.admin.sessions.v1'

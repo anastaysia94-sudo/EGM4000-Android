@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS survey_answers(id {idcol},response_id INTEGER NOT NUL
 CREATE TABLE IF NOT EXISTS admin_features(id TEXT PRIMARY KEY,title TEXT NOT NULL,category TEXT NOT NULL,implementation_status TEXT NOT NULL DEFAULT 'modelled');
 CREATE TABLE IF NOT EXISTS monetization_channels(id TEXT PRIMARY KEY,title TEXT NOT NULL,enabled INTEGER NOT NULL DEFAULT 0,provider_status TEXT NOT NULL DEFAULT 'configuration_required');
 CREATE TABLE IF NOT EXISTS return_features(id TEXT PRIMARY KEY,title TEXT NOT NULL,implementation_status TEXT NOT NULL DEFAULT 'modelled');
+CREATE TABLE IF NOT EXISTS feature_usage_events(id {idcol},user_id INTEGER NOT NULL,feature_id TEXT NOT NULL,event_name TEXT NOT NULL,context_json TEXT NOT NULL DEFAULT '{{}}',created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS checklist(id TEXT PRIMARY KEY,title TEXT NOT NULL,done INTEGER NOT NULL DEFAULT 0,notes TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS audit_events(id {idcol},actor_user_id INTEGER,action TEXT NOT NULL,target_type TEXT,target_id TEXT,details_json TEXT NOT NULL DEFAULT '{{}}',created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS live_sessions(id {idcol},user_id INTEGER NOT NULL,platform TEXT NOT NULL,started_at TEXT NOT NULL,ended_at TEXT,status TEXT NOT NULL DEFAULT 'active',source TEXT NOT NULL DEFAULT 'authorized_capture',created_at TEXT NOT NULL);
@@ -60,6 +61,8 @@ def ensure_schema(con):
         con.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_norm_source_event ON normalized_events(source_event_id) WHERE source_event_id IS NOT NULL')
         con.execute('CREATE INDEX IF NOT EXISTS idx_thread_created ON forum_threads(created_at)')
         con.execute('CREATE INDEX IF NOT EXISTS idx_blog_created ON blog_posts(created_at)')
+        con.execute('CREATE INDEX IF NOT EXISTS idx_feature_usage_user_time ON feature_usage_events(user_id,created_at)')
+        con.execute('CREATE INDEX IF NOT EXISTS idx_feature_usage_feature_time ON feature_usage_events(feature_id,created_at)')
         con.commit()
     except Exception:
         con.rollback()

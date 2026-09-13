@@ -1,6 +1,6 @@
 {
   "schema": "smartpickshop.egm4000.continuity.v1",
-  "updatedAt": "2026-09-06T03:23:00-07:00",
+  "updatedAt": "2026-09-13T12:00:00Z",
   "repository": "anastaysia94-sudo/EGM4000-Android",
   "project": {
     "name": "EGM4000 / EduGameMaster 4000",
@@ -50,7 +50,7 @@
       "C003": "Production owner/auth boundary exists in the full-stack foundation but still requires deployment hardening, recovery controls, production secret/provider configuration and final security validation.",
       "C007": "Admin 100 now has a canonical 100-capability registry with real titles, nine categories, owner-visible evidence notes and CI integrity checks. Verified current state: 38 implemented, 37 modelled, 25 provider-configuration-required. Full end-to-end completion remains outstanding.",
       "C008": "A071-A095 monetization capabilities are explicitly named and remain provider-configuration-required; they are not yet all end-to-end implemented.",
-      "C009": "R001-R049 return-user features and adoption/retention instrumentation are not fully implemented."
+      "C009": "Return-user foundation is implemented with 49 canonical names, 30 verified implemented features, 19 honestly modelled features, a personalized return dashboard, and real first-party adoption events. Full R001-R049 completion remains outstanding."
     }
   },
   "admin100": {
@@ -122,7 +122,7 @@
   "nextMilestones": [
     {"id": "C007", "title": "Implement remaining Admin 100 capabilities", "definitionOfDone": "All A001-A100 capabilities are individually implemented/tested or explicitly marked incomplete; no model-only feature is presented as complete. Current audit baseline is 38/100 implemented."},
     {"id": "C008", "title": "Implement A071-A095 monetization", "definitionOfDone": "Exactly 25 monetization capabilities are implemented inside Admin 100 with safe, non-deceptive controls and measurement."},
-    {"id": "C009", "title": "Implement R001-R049 + adoption analytics", "definitionOfDone": "49 return-user features exist and actual adoption/retention is instrumented without claiming guaranteed use."},
+    {"id": "C009", "title": "Complete remaining 19 return-user features", "definitionOfDone": "All R001-R049 features have testable end-user behavior and actual adoption/retention is measured without synthetic or guaranteed usage claims. Current verified baseline: 30 implemented / 19 modelled."},
     {"id": "C003", "title": "Production auth/deployment hardening", "definitionOfDone": "Production secrets, sole-owner recovery/security controls, HTTPS deployment, rate/CSRF/session validation, backups, monitoring and final security QA are verified."},
     {"id": "C015", "title": "Physical Android + public deployment QA", "definitionOfDone": "Canonical HTTPS backend is configured in Android, APK/AAB is signed, Web/PWA and Android are tested on real devices, and production monitoring/backups are active."},
     {"id": "C016", "title": "Multi-session coaching effectiveness trends", "definitionOfDone": "Completed C014 comparisons roll into confidence-calibrated multi-session trends without turning correlations or random outcomes into causal claims."}

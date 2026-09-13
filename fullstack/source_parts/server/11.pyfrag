@@ -1,0 +1,63 @@
+
+# C009 return-user dashboard and real adoption/retention instrumentation.
+from return_registry import sync_return_registry
+_c009_con=db()
+try:sync_return_registry(_c009_con)
+finally:_c009_con.close()
+
+def _return_dashboard(con,user_id):
+    sessions=rowsdict(con.execute('SELECT id,platform,started_at,duration_min,shots,hits,spend,payout FROM gameplay_sessions WHERE user_id=? ORDER BY started_at DESC LIMIT 120',(user_id,)).fetchall())
+    live=rowsdict(con.execute('SELECT id,platform,started_at,ended_at,status FROM live_sessions WHERE user_id=? ORDER BY started_at DESC LIMIT 30',(user_id,)).fetchall())
+    tips=rowsdict(con.execute('SELECT id,title,confidence,created_at FROM tips WHERE user_id=? ORDER BY created_at DESC LIMIT 20',(user_id,)).fetchall())
+    activity=sorted({str(x.get('started_at',''))[:10] for x in sessions+live if x.get('started_at')},reverse=True)
+    streak=0
+    if activity:
+        try:
+            cursor=datetime.fromisoformat(activity[0]).date()
+            for day in activity:
+                d=datetime.fromisoformat(day).date()
+                if d==cursor:streak+=1;cursor-=timedelta(days=1)
+                elif d<cursor:break
+        except Exception:streak=0
+    last7=[x for x in sessions if str(x.get('started_at',''))[:10] >= (datetime.now(timezone.utc)-timedelta(days=7)).date().isoformat()]
+    prior7=[x for x in sessions if (datetime.now(timezone.utc)-timedelta(days=14)).date().isoformat() <= str(x.get('started_at',''))[:10] < (datetime.now(timezone.utc)-timedelta(days=7)).date().isoformat()]
+    platforms={}
+    for x in sessions:platforms[x['platform']]=platforms.get(x['platform'],0)+1
+    top=max(platforms,key=platforms.get) if platforms else None
+    insight='Record a session to begin an evidence-based daily insight.' if not sessions else f"Your most-recorded platform is {top} across {platforms[top]} saved sessions. Compare similar sessions before changing behavior."
+    weekly=f"{len(last7)} recorded sessions in the last 7 days"
+    change=len(last7)-len(prior7)
+    notifications=[]
+    if tips:notifications.append({'kind':'tip','title':'Latest evidence-linked tip','body':tips[0]['title'],'created_at':tips[0]['created_at']})
+    if not last7:notifications.append({'kind':'review','title':'Evidence check-in','body':'No session is recorded in the last 7 days. A short, accurately logged session is more useful than guessing.','created_at':now()})
+    month=(datetime.now(timezone.utc)-timedelta(days=30)).date().isoformat();monthly=[x for x in sessions if str(x.get('started_at',''))[:10]>=month]
+    return {'schema':'egm.return-dashboard.v1','dailyInsight':insight,'weeklyStory':weekly,'change':{'sessionsVsPriorWeek':change,'current':len(last7),'prior':len(prior7)},'streak':{'days':streak,'basis':'days with recorded evidence; no gambling reward'},'notifications':notifications,'discovery':[{'id':'R047','title':'Experiment journal','why':'Compare coaching guidance with later same-platform evidence.'},{'id':'R021','title':'Evidence drawer','why':'See confidence and provenance behind every coaching claim.'}], 'monthlyReport':{'periodDays':30,'sessions':len(monthly),'platforms':sorted({x['platform'] for x in monthly}),'tips':len([x for x in tips if str(x.get('created_at',''))[:10]>=month]),'boundary':'Descriptive recorded evidence only; not a prediction or profit claim.'},'recentSessions':sessions[:5]}
+
+_c009_get_base=App.do_GET
+def _c009_do_GET(self):
+    path=urlparse(self.path).path
+    if path=='/api/return/dashboard':
+        s=self.need()
+        if not s:return
+        con=db();out=_return_dashboard(con,s['id']);con.close();return self.json(out)
+    if path=='/api/admin/return-adoption':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();rows=rowsdict(con.execute('SELECT f.id,f.title,f.implementation_status,COUNT(e.id) events,COUNT(DISTINCT e.user_id) users,MAX(e.created_at) last_used_at FROM return_features f LEFT JOIN feature_usage_events e ON e.feature_id=f.id GROUP BY f.id,f.title,f.implementation_status ORDER BY f.id').fetchall());total_users=scalar(con,"SELECT COUNT(*) FROM users WHERE status='active' AND is_synthetic=0");con.close()
+        return self.json({'schema':'egm.admin.return-adoption.v1','totalEligibleRealUsers':total_users,'features':rows,'rule':'Counts are measured first-party events. Synthetic seed activity is never manufactured or counted as adoption.'})
+    return _c009_get_base(self)
+App.do_GET=_c009_do_GET
+
+_c009_post_base=App.do_POST
+def _c009_do_POST(self):
+    path=urlparse(self.path).path
+    if path=='/api/return/event':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        feature=clean(b.get('feature_id'),8);event=clean(b.get('event_name') or 'view',40);context=b.get('context') if isinstance(b.get('context'),dict) else {}
+        if not re.fullmatch(r'R0(?:[0-3][0-9]|4[0-9])',feature) or feature=='R000':return self.json({'error':'invalid_return_feature'},400)
+        con=db();known=con.execute('SELECT id FROM return_features WHERE id=?',(feature,)).fetchone()
+        if not known:con.close();return self.json({'error':'unknown_return_feature'},404)
+        con.execute('INSERT INTO feature_usage_events(user_id,feature_id,event_name,context_json,created_at) VALUES(?,?,?,?,?)',(s['id'],feature,event,json.dumps(context)[:2000],now()));con.commit();con.close();return self.json({'ok':True,'feature_id':feature,'event_name':event})
+    return _c009_post_base(self)
+App.do_POST=_c009_do_POST
