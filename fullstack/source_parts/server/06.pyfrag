@@ -1,8 +1,6 @@
         if not str(fp).startswith(str(STATIC.resolve())) or not fp.exists():fp=STATIC/'index.html'
         data=fp.read_bytes();self.send_response(200);self.send_header('Content-Type',mimetypes.guess_type(str(fp))[0] or 'application/octet-stream');self.send_header('Cache-Control','no-cache' if fp.name in ('index.html','sw.js') else 'public,max-age=3600');self.send_common();self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
 
-# C007 canonical Admin 100 registry. Sync at runtime so existing databases with
-# placeholder capability names converge to the same audited source-of-truth.
 from admin_registry import sync_admin_registry,registry_payload
 _admin=db()
 try:sync_admin_registry(_admin)
@@ -56,10 +54,25 @@ def _admin_registry_do_GET(self):
         sid=int(qval(q,'survey_id','0') or 0);con=db();survey=rowdict(con.execute('SELECT id,title FROM surveys WHERE id=?',(sid,)).fetchone())
         if not survey:con.close();return self.json({'error':'survey_not_found'},404)
         rows=rowsdict(con.execute('SELECT r.id response_id,r.user_id,r.visitor_hash,r.created_at,q.id question_id,q.prompt,a.answer_text FROM survey_responses r LEFT JOIN survey_answers a ON a.response_id=r.id LEFT JOIN survey_questions q ON q.id=a.question_id WHERE r.survey_id=? ORDER BY r.id,q.position,q.id',(sid,)).fetchall());con.close();return self.json({'survey':survey,'rows':rows,'privacy':'visitor_hash is pseudonymous; raw IP addresses are not exported'})
+    if path=='/api/admin/trends':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();rows=rowsdict(con.execute("SELECT platform,target_metric,result,COUNT(*) count,AVG(confidence) avg_confidence,AVG(percent_change) avg_percent_change FROM coaching_experiments GROUP BY platform,target_metric,result ORDER BY platform,target_metric,result").fetchall());totals=rowsdict(con.execute("SELECT result,COUNT(*) count FROM coaching_experiments GROUP BY result ORDER BY result").fetchall());con.close();return self.json({'schema':'egm.admin-trends.v1','groups':rows,'results':totals,'rule':'Behavior/evidence-quality comparisons only; random credit outcomes are excluded from coaching success scoring.'})
+    if path=='/api/admin/evidence-diagnostics':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();mix=rowsdict(con.execute('SELECT evidence_type,COUNT(*) count,AVG(confidence) avg_confidence FROM normalized_events GROUP BY evidence_type ORDER BY count DESC').fetchall());sessions=rowsdict(con.execute('SELECT live_session_id,platform,COUNT(*) sample_size,AVG(confidence) avg_confidence,COUNT(DISTINCT evidence_type) evidence_kinds FROM normalized_events GROUP BY live_session_id,platform ORDER BY live_session_id DESC LIMIT 100').fetchall());low=[x for x in sessions if int(x.get('sample_size') or 0)<8 or float(x.get('avg_confidence') or 0)<.6];con.close();return self.json({'schema':'egm.evidence-diagnostics.v1','evidence_mix':mix,'recent_sessions':sessions,'needs_review':low,'review_rule':'Sessions with fewer than 8 events or mean source confidence below 0.60 are flagged for review, not discarded.'})
+    if path=='/api/admin/adapter-health':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();out=[]
+        for adapter in ADAPTERS:
+            aid=adapter['id'];sessions=scalar(con,'SELECT COUNT(*) FROM live_sessions WHERE platform=?',(aid,));events=scalar(con,'SELECT COUNT(*) FROM normalized_events WHERE platform=?',(aid,));last=rowdict(con.execute('SELECT MAX(event_time) last_event_at FROM normalized_events WHERE platform=?',(aid,)).fetchone());configured=True if aid!='fsa' else bool(os.environ.get('EGM_FSA_TELEMETRY_TOKEN'))
+            state='active' if events else ('configured' if configured else 'configuration_required');out.append({**adapter,'configured':configured,'sessions':sessions,'events':events,'last_event_at':last.get('last_event_at') if last else None,'state':state})
+        con.close();return self.json({'schema':'egm.adapter-health.v1','adapters':out,'exactTelemetryRule':'Only the owned F.S.A. bridge may submit exact_telemetry.'})
     return _original_do_GET(self)
 App.do_GET=_admin_registry_do_GET
 
-# Admin writes added as audited C007 controls.
 _admin_post_base=App.do_POST
 def _c007_admin_do_POST(self):
     path=urlparse(self.path).path
@@ -78,8 +91,6 @@ def _c007_admin_do_POST(self):
     return _admin_post_base(self)
 App.do_POST=_c007_admin_do_POST
 
-# F.S.A. remains a separate owned product. Exact telemetry enters only through this
-# token-authenticated bridge; ordinary /api/live/event requests cannot self-label exact data.
 import io
 _c=db();
 try:
