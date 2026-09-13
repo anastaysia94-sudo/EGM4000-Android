@@ -1,0 +1,111 @@
+// C009 completion: My Evidence Lab exposes the remaining return-user behaviors as real, persisted tools.
+const _c009RenderBase=render;
+render=async function(){
+  if(S.view==='lab'){trackReturn('R009','view',{surface:'return_lab'});return returnLab()}
+  return _c009RenderBase()
+};
+
+const _c009TodayBase=today;
+today=async function(){
+  await _c009TodayBase();
+  if(!S.me)return;
+  try{
+    let w=await api('/api/return/workspace'),grid=document.querySelector('.content .grid');
+    if(grid){
+      grid.insertAdjacentHTML('afterbegin',`<div class="card span12"><div class="topline"><div><div class="tag">C009 · Return User Lab</div><h2>Your evidence workspace</h2></div><span class="pill ${w.pause.active?'warn':'good'}">${w.pause.active?'session tools paused':'ready'}</span></div><p class="muted">Personal bests, efficiency boards, goals, media review, smart tags, saved views, and notification controls. Historical evidence only, because randomness refuses to become obedient merely because software has a dashboard.</p><div class="actions"><button class="aqua" id="openReturnLab">Open My Evidence Lab</button>${w.pause.active?`<span class="pill warn">Pause until ${esc(w.pause.until)}</span>`:''}</div></div>`);
+      document.querySelector('#openReturnLab').onclick=()=>{S.view='lab';render()};
+      if(w.pause.active){
+        let startBtn=document.querySelector('[data-go="live"]');
+        if(startBtn){startBtn.disabled=true;startBtn.title='Responsible-play pause is active'}
+      }
+    }
+  }catch(e){console.warn('return workspace unavailable',e)}
+};
+
+const _c009LiveBase=live;
+live=async function(){
+  if(!S.me)return authScreen();
+  try{
+    let w=await api('/api/return/workspace');
+    if(w.pause.active){
+      shell(`<div class="hero"><div class="tag">Responsible-play pause · R018</div><h1>Session tools are paused.</h1><p>${esc(w.pause.message)}</p></div><div class="grid"><div class="card span8"><h2>Pause active until</h2><p class="metric"><b>${esc(w.pause.until)}</b></p><p class="muted">This is your own safety control. EGM4000 does not override it to chase activity metrics.</p><div class="actions"><button id="openReturnLab" class="aqua">Open My Evidence Lab</button></div></div></div>`);
+      document.querySelector('#openReturnLab').onclick=()=>{S.view='lab';render()};
+      return;
+    }
+  }catch(e){}
+  return _c009LiveBase()
+};
+
+function pct(v){return v===null||v===undefined?'—':`${(Number(v)*100).toFixed(1)}%`}
+function efficiencyRows(rows,empty='No matching evidence has been recorded yet.'){
+  if(!rows||!rows.length)return `<p class="muted">${esc(empty)}</p>`;
+  return rows.slice(0,12).map(x=>`<div class="event"><div class="topline"><b>${esc(x.name)}</b><span class="pill">${esc(x.events??x.sessions??0)} samples</span></div><p class="muted">success/hit rate ${pct(x.successRate??x.hitRate)}${x.costPerShot!==undefined&&x.costPerShot!==null?` · recorded cost/shot ${esc(x.costPerShot)}`:''}${x.recordedCost?` · recorded cost ${esc(x.recordedCost)}`:''}${x.source?` · ${esc(x.source)}`:''}</p></div>`).join('')
+}
+function timeRows(rows){
+  if(!rows||!rows.length)return '<p class="muted">No timestamped sessions to compare yet.</p>';
+  return rows.map(x=>`<div class="event"><b>${esc(x.name)}</b><p class="muted">${esc(x.sessions)} sessions · hit rate ${pct(x.hitRate)} · avg duration ${esc(x.avgDurationMin??'—')} min</p></div>`).join('')
+}
+function goalRows(rows){
+  if(!rows.length)return '<p class="muted">No active evidence-use goals yet.</p>';
+  return rows.map(g=>`<div class="event"><div class="topline"><b>${esc(g.title)}</b><span class="pill">${Math.round(Number(g.progress||0)*100)}%</span></div><p class="muted">${esc(g.current)} / ${esc(g.target)}</p><button class="goalDelete" data-id="${esc(g.id)}">Remove</button></div>`).join('')
+}
+function coachRows(rows){
+  if(!rows.length)return '<p class="muted">No coaching tips yet.</p>';
+  return rows.map(t=>`<div class="feed-item"><div class="topline"><b>${esc(t.title)}</b><span class="pill">${esc(t.confidence)} confidence</span></div><p>${esc(t.body)}</p><p class="muted">${t.rating?`Your usefulness rating: ${esc(t.rating)}/5`:'Not rated yet'}</p><div class="actions">${[1,2,3,4,5].map(n=>`<button class="tipRate ${Number(t.rating)===n?'aqua':''}" data-id="${t.tipId}" data-rating="${n}">${n}</button>`).join('')}</div></div>`).join('')
+}
+function mediaRows(rows){
+  if(!rows.length)return '<p class="muted">No screenshot, video, or voice evidence saved yet.</p>';
+  return rows.map(m=>`<div class="event"><div class="topline"><b>${esc(m.kind)} · ${esc(m.fileName)}</b><span class="pill">${Math.round(Number(m.byteSize||0)/1024)} KB</span></div><p>${m.tags.map(t=>`<span class="pill">${esc(t)}</span>`).join(' ')}</p>${m.kind==='screenshot'?`<img src="${esc(m.url)}" alt="${esc(m.fileName)}" style="max-width:100%;max-height:240px;border-radius:12px">`:m.kind==='video'?`<video src="${esc(m.url)}" controls preload="metadata" style="max-width:100%;max-height:260px"></video>`:`<audio src="${esc(m.url)}" controls preload="metadata"></audio>`}<textarea class="mediaReview" data-id="${esc(m.id)}" placeholder="Add evidence review notes">${esc(m.reviewNote||'')}</textarea><button class="saveMediaReview" data-id="${esc(m.id)}">Save review</button></div>`).join('')
+}
+function readDataUrl(file){return new Promise((resolve,reject)=>{let r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error||Error('file_read_failed'));r.readAsDataURL(file)})}
+async function uploadReturnMedia(kind,input){
+  let file=input.files&&input.files[0];if(!file)return;
+  input.disabled=true;
+  try{
+    let data_url=await readDataUrl(file);
+    await post('/api/return/media',{kind,file_name:file.name,mime_type:file.type||'',data_url,platform:S.platform||''});
+    await returnLab()
+  }catch(e){alert(e.message)}
+  finally{input.disabled=false}
+}
+
+async function returnLab(){
+  if(!S.me)return authScreen();
+  let w=await api('/api/return/workspace');
+  const best=w.personalBest;
+  shell(`<div class="hero"><div class="tag">My Evidence Lab · C009 complete surface</div><h1>Review the history. Keep the uncertainty.</h1><p>${esc(w.safetyBoundary)}</p></div><div class="grid">
+    <div class="card span4"><h2>Personal best · R009</h2>${best?`<p class="metric"><b>${pct(best.hitRate)}</b></p><p class="muted">${esc(best.platform)} · ${esc(best.hits)}/${esc(best.shots)} recorded hits/shots · session #${esc(best.sessionId)}</p>`:'<p class="muted">No session with both shots and hits yet.</p>'}</div>
+    <div class="card span4"><h2>Fatigue safeguard · R016</h2><p><span class="pill ${w.fatigueWarning.active?'warn':'good'}">${esc(w.fatigueWarning.level)}</span></p><p>${esc(w.fatigueWarning.message)}</p><p class="muted">Latest recorded duration: ${esc(w.fatigueWarning.durationMin)} min.</p></div>
+    <div class="card span4"><h2>Responsible-play pause · R018</h2><p>${esc(w.pause.message)}</p><div class="actions"><button class="pauseSet" data-min="15">15m</button><button class="pauseSet" data-min="30">30m</button><button class="pauseSet" data-min="60">1h</button><button class="pauseSet" data-min="120">2h</button><button class="pauseSet" data-min="0">Clear</button></div>${w.pause.active?`<p class="warn">Until ${esc(w.pause.until)}</p>`:''}</div>
+    <div class="card span6"><h2>Target-efficiency board · R012</h2>${efficiencyRows(w.targetEfficiency,'Target identity has not been recorded in normalized evidence yet. EGM will not invent it.')}</div>
+    <div class="card span6"><h2>Weapon / cost efficiency · R013</h2>${efficiencyRows(w.weaponEfficiency)}</div>
+    <div class="card span6"><h2>Denomination comparison · R014</h2>${efficiencyRows(w.denominationComparison,'No denomination or bet-level field has been recorded yet.')}</div>
+    <div class="card span6"><h2>Time-of-session analysis · R015</h2>${timeRows(w.timeAnalysis)}</div>
+    <div class="card span6"><h2>Goals & progress · R023–R024</h2><p class="muted">Only evidence-review and reflection goals are allowed. No wager, payout, or “play more” missions.</p><div class="actions"><select id="goalType">${w.goalTypes.map(g=>`<option value="${esc(g.id)}">${esc(g.title)}</option>`).join('')}</select><input id="goalTarget" type="number" min="1" max="365" value="3"><button class="aqua" id="goalAdd">Add goal</button></div><div id="goalRows">${goalRows(w.goals)}</div></div>
+    <div class="card span6"><h2>Learning achievements · R026</h2>${w.achievements.map(a=>`<div class="event"><b>${a.earned?'✓':'○'} ${esc(a.title)}</b><p class="muted">${esc(a.why)}</p></div>`).join('')}<h3>Personal missions · R027</h3>${w.missions.map(m=>`<p><span class="pill ${m.done?'good':''}">${m.done?'done':'open'}</span> ${esc(m.title)}</p>`).join('')}</div>
+    <div class="card span12"><h2>Coach inbox + tip usefulness · R006 / R028</h2><p class="muted">Ratings help you remember which coaching was useful. They do not prove a tip caused a future result.</p>${coachRows(w.coachInbox)}</div>
+    <div class="card span4"><h2>Screenshot intake · R031</h2><input id="shotUpload" type="file" accept="image/png,image/jpeg,image/webp"><p class="muted">Max 2 MB. Upload only evidence you are authorized to store.</p></div>
+    <div class="card span4"><h2>Video review workspace · R032</h2><input id="videoUpload" type="file" accept="video/webm,video/mp4"><p class="muted">Max 8 MB. Review notes remain yours, not hidden-state claims.</p></div>
+    <div class="card span4"><h2>Voice session notes · R033</h2><input id="voiceUpload" type="file" accept="audio/webm,audio/ogg,audio/mp4,audio/mpeg" capture><p class="muted">On supported mobile browsers this can open an audio recorder; otherwise choose an audio note. Max 4 MB.</p><textarea id="voiceTranscript" placeholder="Optional transcript / reflection"></textarea><button id="voiceTranscriptSave">Save transcript</button></div>
+    <div class="card span12"><h2>Evidence media</h2>${mediaRows(w.media)}</div>
+    <div class="card span6"><h2>Smart tags · R034</h2>${w.smartTags.length?w.smartTags.map(t=>`<span class="pill">${esc(t.tag)} · ${esc(t.count)}</span>`).join(' '):'<p class="muted">Tags appear after evidence notes or media are saved.</p>'}<textarea id="reflectionNote" placeholder="Write an evidence reflection"></textarea><button id="reflectionSave" class="aqua">Save reflection</button></div>
+    <div class="card span6"><h2>Saved views · R035</h2><div class="actions"><input id="viewTitle" placeholder="e.g. Evening evidence review"><button id="saveView">Save current view</button></div>${w.savedViews.length?w.savedViews.map(v=>`<div class="event"><b>${esc(v.title)}</b><button class="viewDelete" data-id="${esc(v.id)}">Remove</button></div>`).join(''):'<p class="muted">No saved evidence views yet.</p>'}</div>
+    <div class="card span6"><h2>Notification controls · R041</h2><label><input id="notifyAll" type="checkbox" ${w.notificationControls.notifications_enabled?'checked':''}> Notification center enabled</label><label><input id="notifyTips" type="checkbox" ${w.notificationControls.tip_notifications?'checked':''}> Tip notifications</label><label><input id="notifyReviews" type="checkbox" ${w.notificationControls.review_notifications?'checked':''}> Evidence-review reminders</label><button id="saveNotify" class="aqua">Save controls</button></div>
+    <div class="card span6"><h2>Recent reflection notes</h2>${w.notes.length?w.notes.slice(0,8).map(n=>`<div class="event"><b>${esc(n.noteType)}</b><p>${esc(n.body)}</p><p>${n.tags.map(t=>`<span class="pill">${esc(t)}</span>`).join(' ')}</p></div>`).join(''):'<p class="muted">No reflection notes yet.</p>'}</div>
+  </div>`);
+
+  ['R012','R013','R014','R015','R016','R024','R026','R027','R028','R034','R041'].forEach(id=>trackReturn(id,'view',{surface:'return_lab'}));
+  document.querySelectorAll('.pauseSet').forEach(b=>b.onclick=async()=>{await post('/api/return/pause',{minutes:+b.dataset.min});returnLab()});
+  document.querySelector('#goalAdd').onclick=async()=>{await post('/api/return/goal',{goal_type:document.querySelector('#goalType').value,target:+document.querySelector('#goalTarget').value});returnLab()};
+  document.querySelectorAll('.goalDelete').forEach(b=>b.onclick=async()=>{await post('/api/return/goal',{action:'delete',id:b.dataset.id});returnLab()});
+  document.querySelectorAll('.tipRate').forEach(b=>b.onclick=async()=>{await post('/api/return/tip-rating',{tip_id:+b.dataset.id,rating:+b.dataset.rating});returnLab()});
+  document.querySelector('#shotUpload').onchange=e=>uploadReturnMedia('screenshot',e.target);
+  document.querySelector('#videoUpload').onchange=e=>uploadReturnMedia('video',e.target);
+  document.querySelector('#voiceUpload').onchange=e=>uploadReturnMedia('voice',e.target);
+  document.querySelector('#voiceTranscriptSave').onclick=async()=>{let body=document.querySelector('#voiceTranscript').value.trim();if(!body)return;await post('/api/return/note',{note_type:'voice_transcript',body,platform:S.platform||''});returnLab()};
+  document.querySelector('#reflectionSave').onclick=async()=>{let body=document.querySelector('#reflectionNote').value.trim();if(!body)return;await post('/api/return/note',{note_type:'reflection',body,platform:S.platform||''});returnLab()};
+  document.querySelector('#saveView').onclick=async()=>{let title=document.querySelector('#viewTitle').value.trim();if(!title)return;await post('/api/return/saved-view',{title,config:{surface:'return_lab',platform:S.platform||'',saved_at:new Date().toISOString()}});returnLab()};
+  document.querySelectorAll('.viewDelete').forEach(b=>b.onclick=async()=>{await post('/api/return/saved-view',{action:'delete',id:b.dataset.id});returnLab()});
+  document.querySelectorAll('.saveMediaReview').forEach(b=>b.onclick=async()=>{let note=document.querySelector(`.mediaReview[data-id="${CSS.escape(b.dataset.id)}"]`).value;await post('/api/return/media-review',{id:b.dataset.id,review_note:note,platform:S.platform||''});returnLab()});
+  document.querySelector('#saveNotify').onclick=async()=>{await post('/api/return/preferences',{notifications_enabled:document.querySelector('#notifyAll').checked,tip_notifications:document.querySelector('#notifyTips').checked,review_notifications:document.querySelector('#notifyReviews').checked});returnLab()};
+}

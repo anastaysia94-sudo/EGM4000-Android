@@ -12,11 +12,9 @@ TITLES = [
     'Research sandbox','Experiment journal','Feature discovery','Monthly personal report'
 ]
 
-# These IDs have a concrete UI, route, persistence behavior, or platform control.
-# Everything else stays visibly modelled until its actual behavior is verified.
-IMPLEMENTED = {
-    1,2,3,4,5,7,8,10,11,17,19,20,21,22,25,29,30,36,37,38,39,40,42,43,44,45,46,47,48,49
-}
+# C009 is complete only because every R001-R049 feature now has a concrete
+# end-user UI, route, persistence behavior, derived evidence view, or platform control.
+IMPLEMENTED = set(range(1, 50))
 
 def sync_return_registry(con):
     for number, title in enumerate(TITLES, 1):
@@ -29,8 +27,7 @@ def sync_return_registry(con):
             con.execute('INSERT INTO return_features(id,title,implementation_status) VALUES(?,?,?)',(feature_id,title,status))
         done=1 if status=='implemented' else 0
         if con.execute('SELECT id FROM checklist WHERE id=?',(feature_id,)).fetchone():
-            con.execute('UPDATE checklist SET title=?,done=?,notes=? WHERE id=?',(title,done,'C009 verified implementation ledger',feature_id))
+            con.execute('UPDATE checklist SET title=?,done=?,notes=? WHERE id=?',(title,done,'C009 verified end-user implementation ledger',feature_id))
         else:
-            con.execute('INSERT INTO checklist(id,title,done,notes) VALUES(?,?,?,?)',(feature_id,title,done,'C009 verified implementation ledger'))
+            con.execute('INSERT INTO checklist(id,title,done,notes) VALUES(?,?,?,?)',(feature_id,title,done,'C009 verified end-user implementation ledger'))
     con.commit()
-

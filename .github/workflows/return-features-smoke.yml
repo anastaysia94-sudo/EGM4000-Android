@@ -1,0 +1,135 @@
+name: EGM4000 C009 Return User Lab
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/return-features-smoke.yml"
+  pull_request:
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/return-features-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  return-user-lab:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fullstack
+    env:
+      EGM_OWNER_PASSWORD: ${{ github.sha }}
+      EGM_PORT: "8041"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install runtime dependency
+        run: pip install -r requirements.txt
+
+      - name: Assemble, syntax-check, and verify 49-feature registry
+        env:
+          EGM_ASSEMBLE_ONLY: "1"
+        run: |
+          python -m py_compile bootstrap_db.py storage.py live_intelligence.py admin_registry.py return_registry.py return_workspace.py server.py
+          python server.py
+          node --check static/app.js
+          python test_return_features.py
+
+      - name: Seed real-owner evidence fixture
+        run: |
+          rm -rf data
+          python bootstrap_db.py --force
+          python - <<'PY'
+          from datetime import datetime,timezone
+          from storage import connect
+          stamp=datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+          con=connect()
+          con.execute("INSERT INTO gameplay_sessions(id,user_id,platform,started_at,duration_min,spend,payout,shots,hits,notes,source) VALUES(9991,1,'Fire Kirin',?,75,20,18,100,25,'C009 CI evidence','manual')",(stamp,))
+          con.execute("INSERT INTO tips(id,user_id,session_id,created_at,title,body,evidence,confidence) VALUES(9991,1,9991,?,'Review pace','Compare repeated recorded evidence.','C009 CI evidence','medium')",(stamp,))
+          con.execute("INSERT INTO live_sessions(id,user_id,platform,started_at,ended_at,status,source,created_at) VALUES(9991,1,'Fire Kirin',?,?,'ended','authorized_capture',?)",(stamp,stamp,stamp))
+          con.execute("INSERT INTO normalized_events(id,live_session_id,user_id,source_event_id,event_time,platform,event_type,source,evidence_type,confidence,payload_json,created_at) VALUES(9991,9991,1,'c009-e1',?,'Fire Kirin','shot_fired','manual','observed_evidence',1,'{\"target\":\"clownfish\",\"weapon\":\"level-5\",\"denomination\":\"10\",\"cost\":0.1}',?)",(stamp,stamp))
+          con.execute("INSERT INTO normalized_events(id,live_session_id,user_id,source_event_id,event_time,platform,event_type,source,evidence_type,confidence,payload_json,created_at) VALUES(9992,9991,1,'c009-e2',?,'Fire Kirin','target_hit','manual','observed_evidence',1,'{\"target\":\"clownfish\",\"weapon\":\"level-5\",\"denomination\":\"10\",\"hit\":true}',?)",(stamp,stamp))
+          con.commit();con.close()
+          PY
+
+      - name: HTTP smoke all remaining C009 persistence surfaces
+        run: |
+          python server.py > /tmp/egm4000-c009.log 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 25); do
+            if curl -fsS http://127.0.0.1:8041/api/health | grep -q 'egm.event.v1'; then ready=1; break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then cat /tmp/egm4000-c009.log >&2 || true; exit 1; fi
+            sleep 1
+          done
+          test "$ready" -eq 1
+
+          python - <<'PY' > /tmp/c009-login.json
+          import json,os
+          print(json.dumps({"username":"EGM4000Owner","password":os.environ["EGM_OWNER_PASSWORD"]}))
+          PY
+          curl -fsS -c /tmp/c009.cookies -H 'Content-Type: application/json' --data-binary @/tmp/c009-login.json http://127.0.0.1:8041/api/login | grep -q '"ok": true'
+          curl -fsS -b /tmp/c009.cookies http://127.0.0.1:8041/api/me > /tmp/c009-me.json
+          CSRF=$(python -c "import json;print(json.load(open('/tmp/c009-me.json'))['csrf'])")
+
+          curl -fsS -b /tmp/c009.cookies http://127.0.0.1:8041/api/return/workspace > /tmp/c009-workspace.json
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/c009-workspace.json'))
+          assert x["schema"]=="egm.return-workspace.v1"
+          assert x["personalBest"]["hitRate"]==0.25
+          assert x["targetEfficiency"][0]["name"]=="clownfish"
+          assert x["weaponEfficiency"][0]["name"]=="level-5"
+          assert x["denominationComparison"][0]["name"]=="10"
+          assert x["fatigueWarning"]["active"] is True
+          PY
+
+          curl -fsS -b /tmp/c009.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"tip_id":9991,"rating":5,"note":"Useful evidence review"}' http://127.0.0.1:8041/api/return/tip-rating | grep -q '"rating": 5'
+          curl -fsS -b /tmp/c009.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"goal_type":"tip_reviews","target":3}' http://127.0.0.1:8041/api/return/goal | grep -q '"ok": true'
+          curl -fsS -b /tmp/c009.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"notifications_enabled":true,"tip_notifications":false,"review_notifications":true}' http://127.0.0.1:8041/api/return/preferences | grep -q '"tip_notifications": false'
+          curl -fsS -b /tmp/c009.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"minutes":30}' http://127.0.0.1:8041/api/return/pause | grep -q '"active": true'
+          curl -fsS -b /tmp/c009.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"note_type":"reflection","body":"Review pacing and take a break."}' http://127.0.0.1:8041/api/return/note | grep -q '"ok": true'
+          curl -fsS -b /tmp/c009.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"note_type":"voice_transcript","body":"Voice reflection about evidence quality."}' http://127.0.0.1:8041/api/return/note | grep -q '"ok": true'
+          curl -fsS -b /tmp/c009.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"title":"Evening evidence review","config":{"surface":"return_lab","platform":"Fire Kirin"}}' http://127.0.0.1:8041/api/return/saved-view | grep -q '"ok": true'
+
+          python - <<'PY'
+          import base64,json
+          payloads=[
+            ("screenshot","pixel.png","image/png",b"\x89PNG\r\n\x1a\n"+b"test"),
+            ("video","clip.webm","video/webm",b"\x1aE\xdf\xa3"+b"test"),
+            ("voice","note.webm","audio/webm",b"\x1aE\xdf\xa3"+b"test"),
+          ]
+          for kind,name,mime,raw in payloads:
+              with open(f"/tmp/c009-{kind}.json","w") as f:
+                  json.dump({"kind":kind,"file_name":name,"mime_type":mime,"data_url":f"data:{mime};base64,{base64.b64encode(raw).decode()}"},f)
+          PY
+          for kind in screenshot video voice; do
+            curl -fsS -b /tmp/c009.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' --data-binary @/tmp/c009-$kind.json http://127.0.0.1:8041/api/return/media | tee /tmp/c009-$kind-out.json | grep -q '"ok": true'
+          done
+          MEDIA_ID=$(python -c "import json;print(json.load(open('/tmp/c009-screenshot-out.json'))['id'])")
+          curl -fsS -b /tmp/c009.cookies "http://127.0.0.1:8041/api/return/media?id=$MEDIA_ID" > /tmp/c009-media.bin
+          test -s /tmp/c009-media.bin
+          curl -fsS -b /tmp/c009.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d "{\"id\":\"$MEDIA_ID\",\"review_note\":\"Screenshot evidence review\"}" http://127.0.0.1:8041/api/return/media-review | grep -q '"ok": true'
+
+          curl -fsS -b /tmp/c009.cookies http://127.0.0.1:8041/api/return/workspace > /tmp/c009-final.json
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/c009-final.json'))
+          assert x["coachInbox"][0]["rating"]==5
+          assert x["goals"][0]["current"]>=1
+          assert x["pause"]["active"] is True
+          assert len(x["media"])==3
+          assert len(x["notes"])>=2
+          assert x["savedViews"]
+          assert x["smartTags"]
+          PY
+
+          curl -fsS -b /tmp/c009.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"minutes":0}' http://127.0.0.1:8041/api/return/pause | grep -q '"active": false'
