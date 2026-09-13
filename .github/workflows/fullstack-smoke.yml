@@ -43,8 +43,8 @@ jobs:
           rows=c.execute('SELECT id,title,category,implementation_status FROM admin_features ORDER BY id').fetchall()
           assert len(rows)==100
           statuses={s:sum(1 for r in rows if r[3]==s) for s in {'implemented','modelled','provider_configuration_required'}}
-          assert statuses=={'implemented':56,'modelled':19,'provider_configuration_required':25},statuses
-          for fid in ('A034','A041','A042','A043','A044','A045','A058','A059','A060'):
+          assert statuses=={'implemented':60,'modelled':15,'provider_configuration_required':25},statuses
+          for fid in ('A008','A034','A041','A042','A043','A044','A045','A058','A059','A060','A061','A065','A098'):
               assert c.execute('SELECT done FROM checklist WHERE id=?',(fid,)).fetchone()[0]==1,fid
           print('Admin 100 verified',statuses)
           PY
@@ -76,7 +76,10 @@ jobs:
           print(json.dumps({'username':'EGM4000Owner','password':os.environ['EGM_OWNER_PASSWORD']}))
           PY
           curl -fsS -c /tmp/egm.cookies -H 'Content-Type: application/json' --data-binary @/tmp/login.json http://127.0.0.1:8040/api/login | grep -q '"ok": true'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/features | grep -q 'Cross-session trend dashboard'
+          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/features | grep -q 'Retention-feature registry visibility'
           curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/coaching-trends | grep -q 'egm.admin.coaching-trends.v1'
           curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/evidence-quality | grep -q 'egm.admin.evidence-quality.v1'
           curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/adapter-health | grep -q 'egm.admin.adapter-health.v1'
+          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/fsa-status | grep -q 'egm.admin.fsa-status.v1'
+          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/storage-health | grep -q 'egm.admin.storage-health.v1'
+          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/return-features | grep -q 'egm.admin.return-features.v1'
