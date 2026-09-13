@@ -1,0 +1,69 @@
+
+# C008 provider-independent revenue surfaces: tracked referrals, disclosed sponsored
+# education, course upsells, hardware referrals, and promotional bundles.
+from monetization_assets import admin_assets,archive_asset,migrate_monetization_assets,public_catalog,resolve_click,save_asset
+
+_c008a=db()
+try:migrate_monetization_assets(_c008a)
+finally:_c008a.close()
+
+_C008_ASSET_FIELDS={'id','kind','slug','title','body','price_label','destination_url','disclosure','active','action'}
+_C008_SECRET_RE=re.compile(r'(secret|token|password|private|api[_-]?key|credential)',re.I)
+
+def _c008_asset_write_error(self,exc):
+    code=str(exc)
+    status=404 if code=='asset_not_found' else 400
+    return self.json({'error':code},status)
+
+_c008a_get_base=App.do_GET
+def _c008a_do_GET(self):
+    parsed=urlparse(self.path);path=parsed.path
+    if path=='/api/admin/monetization-assets':
+        s=self.need(owner=True)
+        if not s:return
+        con=db()
+        try:payload=admin_assets(con)
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/monetization/catalog':
+        con=db()
+        try:payload=public_catalog(con)
+        finally:con.close()
+        return self.json(payload)
+    if path.startswith('/go/'):
+        slug=path[len('/go/'):].strip('/')[:80]
+        if not slug:return self.json({'error':'asset_not_found'},404)
+        con=db()
+        try:asset=resolve_click(con,slug)
+        finally:con.close()
+        if not asset:return self.json({'error':'asset_not_found'},404)
+        self.send_response(302)
+        self.send_header('Location',asset['destinationUrl'])
+        self.send_header('Cache-Control','no-store')
+        self.send_common();self.end_headers();return
+    return _c008a_get_base(self)
+App.do_GET=_c008a_do_GET
+
+_c008a_post_base=App.do_POST
+def _c008a_do_POST(self):
+    path=urlparse(self.path).path
+    if path=='/api/admin/monetization-asset':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        unknown=set(b)-_C008_ASSET_FIELDS
+        if any(_C008_SECRET_RE.search(str(k)) for k in b) or unknown:
+            return self.json({'error':'unsupported_or_secret_fields','fields':sorted(str(k) for k in unknown)},400)
+        con=db()
+        try:
+            if clean(b.get('action'),20)=='archive':
+                asset=archive_asset(con,b.get('id'),s['id']);action='monetization_asset_archived'
+            else:
+                asset=save_asset(con,s['id'],b);action='monetization_asset_saved'
+            audit(con,s['id'],action,'monetization_asset',asset['id'],{'capability_id':asset['capabilityId'],'kind':asset['kind'],'active':asset['active'],'slug':asset['slug']})
+            con.commit()
+        except ValueError as exc:
+            con.rollback();con.close();return _c008_asset_write_error(self,exc)
+        con.close()
+        return self.json({'ok':True,'asset':asset})
+    return _c008a_post_base(self)
+App.do_POST=_c008a_do_POST
