@@ -1,0 +1,36 @@
+// C008 provider-independent commercial surfaces. All outbound links use the
+// measured /go/<slug> handoff and remain visibly separate from gameplay evidence.
+const _c008AssetsAdminBase=admin;
+admin=async function(){
+  await _c008AssetsAdminBase();
+  if(!S.me||S.me.role!=='owner')return;
+  try{
+    const data=await api('/api/admin/monetization-assets');
+    const grid=document.querySelector('.content .grid');
+    if(!grid)return;
+    const kinds={partner_referral:'Partner referral · A079',sponsored_education:'Sponsored education · A081',hardware_referral:'Hardware/capture referral · A090',course_upsell:'Training/course upsell · A091',promo_bundle:'Promotional bundle · A093'};
+    const rows=data.assets.length?data.assets.map(a=>`<div class="event c008-asset" data-json="${esc(encodeURIComponent(JSON.stringify(a)))}"><div class="topline"><div><b>${esc(a.capabilityId)} · ${esc(a.title)}</b><p class="muted">${esc(kinds[a.kind]||a.kind)} · /go/${esc(a.slug)}</p></div><span class="pill ${a.active?'good':''}">${a.active?'active':'archived'} · ${esc(a.clicks)} clicks</span></div><p>${esc(a.body||'')}</p>${a.priceLabel?`<p><span class="pill">${esc(a.priceLabel)}</span></p>`:''}${a.disclosure?`<p class="muted">${esc(a.disclosure)}</p>`:''}<div class="actions"><button class="c008-edit">Edit</button>${a.active?'<button class="c008-archive">Archive</button>':''}</div></div>`).join(''):'<p class="muted">No provider-independent commercial assets yet.</p>';
+    grid.insertAdjacentHTML('beforeend',`<div class="card span12" id="c008AssetControl"><div class="topline"><div><div class="tag">C008 · Provider-independent launch slice</div><h2>Tracked offers without pretending billing exists</h2></div><span class="pill">${data.assets.length} assets</span></div><p class="muted">${esc(data.privacy)}</p><div class="grid"><div class="card span5"><input id="c008AssetId" type="hidden"><label>Capability</label><select id="c008AssetKind">${Object.entries(kinds).map(([k,v])=>`<option value="${esc(k)}">${esc(v)}</option>`).join('')}</select><label>Title</label><input id="c008AssetTitle" maxlength="180" placeholder="Clear customer-facing title"><label>Description</label><textarea id="c008AssetBody" maxlength="3000" placeholder="What this optional offer provides"></textarea><label>Price / offer label</label><input id="c008AssetPrice" maxlength="120" placeholder="$19, Free guide, 10% partner discount…"><label>HTTPS destination</label><input id="c008AssetUrl" maxlength="1200" placeholder="https://…"><label>Disclosure</label><input id="c008AssetDisclosure" maxlength="300" placeholder="Sponsored / affiliate disclosure when applicable"><label class="pill"><input id="c008AssetActive" type="checkbox"> Active publicly</label><div class="actions"><button id="c008AssetSave" class="aqua">Save asset</button><button id="c008AssetClear">Clear</button></div><p class="muted">Secrets, API keys, insecure HTTP links, private literal IPs, and guaranteed-profit/winnings claims are rejected server-side.</p></div><div class="card span7"><h3>Live asset ledger</h3>${rows}</div></div></div>`);
+    const clear=()=>{document.querySelector('#c008AssetId').value='';document.querySelector('#c008AssetTitle').value='';document.querySelector('#c008AssetBody').value='';document.querySelector('#c008AssetPrice').value='';document.querySelector('#c008AssetUrl').value='';document.querySelector('#c008AssetDisclosure').value='';document.querySelector('#c008AssetActive').checked=false};
+    document.querySelector('#c008AssetClear').onclick=clear;
+    document.querySelector('#c008AssetSave').onclick=async()=>{
+      const payload={id:document.querySelector('#c008AssetId').value||undefined,kind:document.querySelector('#c008AssetKind').value,title:document.querySelector('#c008AssetTitle').value,body:document.querySelector('#c008AssetBody').value,price_label:document.querySelector('#c008AssetPrice').value,destination_url:document.querySelector('#c008AssetUrl').value,disclosure:document.querySelector('#c008AssetDisclosure').value,active:document.querySelector('#c008AssetActive').checked};
+      try{await post('/api/admin/monetization-asset',payload);await admin()}catch(e){alert(e.message)}
+    };
+    document.querySelectorAll('.c008-edit').forEach(btn=>btn.onclick=()=>{const a=JSON.parse(decodeURIComponent(btn.closest('.c008-asset').dataset.json));document.querySelector('#c008AssetId').value=a.id;document.querySelector('#c008AssetKind').value=a.kind;document.querySelector('#c008AssetTitle').value=a.title;document.querySelector('#c008AssetBody').value=a.body||'';document.querySelector('#c008AssetPrice').value=a.priceLabel||'';document.querySelector('#c008AssetUrl').value=a.destinationUrl||'';document.querySelector('#c008AssetDisclosure').value=a.disclosure||'';document.querySelector('#c008AssetActive').checked=!!a.active;document.querySelector('#c008AssetControl').scrollIntoView({behavior:'smooth'})});
+    document.querySelectorAll('.c008-archive').forEach(btn=>btn.onclick=async()=>{const a=JSON.parse(decodeURIComponent(btn.closest('.c008-asset').dataset.json));try{await post('/api/admin/monetization-asset',{action:'archive',id:a.id});await admin()}catch(e){alert(e.message)}});
+  }catch(e){console.warn('C008 asset control unavailable',e)}
+};
+
+const _c008AssetsTodayBase=today;
+today=async function(){
+  await _c008AssetsTodayBase();
+  if(!S.me)return;
+  try{
+    const data=await api('/api/monetization/catalog');
+    if(!data.assets||!data.assets.length)return;
+    const grid=document.querySelector('.content .grid');if(!grid)return;
+    const cards=data.assets.map(a=>`<div class="event"><div class="topline"><b>${esc(a.title)}</b>${a.sponsored?'<span class="pill warn">Sponsored</span>':'<span class="pill">Optional offer</span>'}</div><p>${esc(a.body||'')}</p>${a.priceLabel?`<p><span class="pill">${esc(a.priceLabel)}</span></p>`:''}${a.disclosure?`<p class="muted">${esc(a.disclosure)}</p>`:''}<a class="button" href="${esc(a.goUrl)}" target="_blank" rel="noopener noreferrer sponsored">View offer ↗</a></div>`).join('');
+    grid.insertAdjacentHTML('beforeend',`<div class="card span12"><div class="tag">Optional resources & offers</div><h2>Commercial links stay separate from evidence</h2><p class="muted">${esc(data.safety)}</p>${cards}</div>`);
+  }catch(e){console.warn('public offer catalog unavailable',e)}
+};
