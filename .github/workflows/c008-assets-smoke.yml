@@ -1,0 +1,114 @@
+name: EGM4000 C008 Provider-Independent Assets
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-assets-smoke.yml"
+  pull_request:
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-assets-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  c008-assets:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fullstack
+    env:
+      EGM_OWNER_PASSWORD: ${{ github.sha }}
+      EGM_PORT: "8042"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install runtime dependency
+        run: pip install -r requirements.txt
+
+      - name: Assemble, syntax-check, and run module contract
+        env:
+          EGM_ASSEMBLE_ONLY: "1"
+        run: |
+          python -m py_compile bootstrap_db.py storage.py admin_registry.py monetization_assets.py server.py
+          python server.py
+          node --check static/app.js
+          python test_monetization_assets.py
+
+      - name: Authenticated and public HTTP smoke
+        run: |
+          rm -rf data
+          python bootstrap_db.py --force
+          python server.py > /tmp/egm4000-c008.log 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 25); do
+            if curl -fsS http://127.0.0.1:8042/api/health | grep -q 'egm.event.v1'; then ready=1; break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then cat /tmp/egm4000-c008.log >&2 || true; exit 1; fi
+            sleep 1
+          done
+          test "$ready" -eq 1
+
+          python - <<'PY' > /tmp/c008-login.json
+          import json,os
+          print(json.dumps({"username":"EGM4000Owner","password":os.environ["EGM_OWNER_PASSWORD"]}))
+          PY
+          curl -fsS -c /tmp/c008.cookies -H 'Content-Type: application/json' --data-binary @/tmp/c008-login.json http://127.0.0.1:8042/api/login | grep -q '"ok": true'
+          curl -fsS -b /tmp/c008.cookies http://127.0.0.1:8042/api/me > /tmp/c008-me.json
+          CSRF=$(python -c "import json;print(json.load(open('/tmp/c008-me.json'))['csrf'])")
+
+          cat > /tmp/c008-asset.json <<'JSON'
+          {"kind":"partner_referral","title":"Evidence learning partner","body":"Optional evidence-literacy resource.","price_label":"Optional","destination_url":"https://example.com/partner","active":true}
+          JSON
+          curl -fsS -b /tmp/c008.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' --data-binary @/tmp/c008-asset.json http://127.0.0.1:8042/api/admin/monetization-asset > /tmp/c008-created.json
+          grep -q '"ok": true' /tmp/c008-created.json
+          ASSET_ID=$(python -c "import json;print(json.load(open('/tmp/c008-created.json'))['asset']['id'])")
+          SLUG=$(python -c "import json;print(json.load(open('/tmp/c008-created.json'))['asset']['slug'])")
+
+          curl -fsS http://127.0.0.1:8042/api/monetization/catalog > /tmp/c008-catalog.json
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/c008-catalog.json'))
+          assert x['schema']=='egm.monetization-catalog.v1'
+          assert len(x['assets'])==1
+          assert x['assets'][0]['capabilityId']=='A079'
+          assert 'destinationUrl' not in x['assets'][0]
+          PY
+
+          curl -sS -o /dev/null -D /tmp/c008-redirect.headers "http://127.0.0.1:8042/go/$SLUG"
+          grep -qi '^Location: https://example.com/partner' /tmp/c008-redirect.headers
+          curl -fsS -b /tmp/c008.cookies http://127.0.0.1:8042/api/admin/monetization-assets > /tmp/c008-owner.json
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/c008-owner.json'))
+          assert x['assets'][0]['clicks']==1
+          assert x['capabilities']['A079']['clicks']==1
+          PY
+
+          badcode=$(curl -sS -o /tmp/c008-badurl.json -w '%{http_code}' -b /tmp/c008.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"kind":"hardware_referral","title":"Hardware","destination_url":"http://example.com/insecure","active":true}' http://127.0.0.1:8042/api/admin/monetization-asset)
+          test "$badcode" = "400"
+          grep -q 'https_destination_required' /tmp/c008-badurl.json
+
+          claimcode=$(curl -sS -o /tmp/c008-claim.json -w '%{http_code}' -b /tmp/c008.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"kind":"promo_bundle","title":"Guaranteed profit bundle","destination_url":"https://example.com/bad","active":true}' http://127.0.0.1:8042/api/admin/monetization-asset)
+          test "$claimcode" = "400"
+          grep -q 'unsafe_guarantee_claim' /tmp/c008-claim.json
+
+          curl -fsS -b /tmp/c008.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"kind":"sponsored_education","title":"Evidence basics","body":"Optional sponsor-supported lesson.","destination_url":"https://example.com/lesson","active":true}' http://127.0.0.1:8042/api/admin/monetization-asset | grep -q 'Sponsored educational placement'
+          curl -fsS http://127.0.0.1:8042/api/monetization/catalog > /tmp/c008-catalog2.json
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/c008-catalog2.json'))
+          assert any(a['sponsored'] is True and a['disclosure']=='Sponsored educational placement.' for a in x['assets'])
+          PY
+
+          curl -fsS -b /tmp/c008.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d "{\"action\":\"archive\",\"id\":\"$ASSET_ID\"}" http://127.0.0.1:8042/api/admin/monetization-asset | grep -q '"active": false'
+          archived=$(curl -sS -o /tmp/c008-archived.json -w '%{http_code}' "http://127.0.0.1:8042/go/$SLUG")
+          test "$archived" = "404"
