@@ -1,0 +1,32 @@
+// C008 A080 affiliate attribution. Referral codes are first-party identifiers, not visitor fingerprints.
+try{
+  const ref=new URLSearchParams(location.search).get('ref');
+  if(ref&&/^[A-Za-z0-9_-]{3,40}$/.test(ref))localStorage.setItem('egm4000.affiliateRef',ref.toUpperCase());
+}catch(e){}
+
+const _c008AffiliateBootBase=boot;
+boot=async function(){
+  await _c008AffiliateBootBase();
+  const code=localStorage.getItem('egm4000.affiliateRef');
+  if(S.me&&S.csrf&&code){
+    try{await post('/api/affiliate/claim',{code});localStorage.removeItem('egm4000.affiliateRef')}
+    catch(e){console.warn('affiliate attribution unavailable',e)}
+  }
+};
+
+const _c008AffiliateAdminBase=admin;
+admin=async function(){
+  await _c008AffiliateAdminBase();
+  if(!S.me||S.me.role!=='owner')return;
+  try{
+    const data=await api('/api/admin/affiliates');
+    const grid=document.querySelector('.content .grid');if(!grid)return;
+    const rows=data.partners.length?data.partners.map(p=>`<div class="event c008-aff-row" data-id="${esc(p.id)}" data-code="${esc(p.code)}" data-label="${esc(p.label)}" data-landing="${esc(p.landingPath)}" data-active="${p.active?'1':'0'}"><div class="topline"><div><b>${esc(p.label)}</b><p class="muted"><code>${esc(p.referralPath)}</code> → ${esc(p.landingPath)}</p></div><span class="pill ${p.active?'good':''}">${p.active?'active':'archived'}</span></div><p class="muted">${esc(p.clicks)} clicks · ${esc(p.signups)} attributed signups · conversion ${p.conversionRate===null?'—':(Number(p.conversionRate)*100).toFixed(1)+'%'}</p><div class="actions"><button class="c008-aff-edit">Edit</button>${p.active?'<button class="c008-aff-archive">Archive</button>':''}</div></div>`).join(''):'<p class="muted">No affiliate partners yet.</p>';
+    grid.insertAdjacentHTML('beforeend',`<div class="card span12" id="c008AffiliateControl"><div class="topline"><div><div class="tag">C008 · A080 Affiliate Attribution</div><h2>First-party referral tracking</h2></div><span class="pill">${esc(data.partners.length)} partners</span></div><p class="muted">${esc(data.privacy)}</p><div class="grid"><div class="card span5"><input id="c008AffId" type="hidden"><label>Partner label</label><input id="c008AffLabel" maxlength="140" placeholder="Creator, coach, publication…"><label>Referral code</label><input id="c008AffCode" maxlength="40" placeholder="CREATOR-NAME"><label>Same-origin landing path</label><input id="c008AffLanding" maxlength="240" value="/" placeholder="/"><label class="pill"><input id="c008AffActive" type="checkbox" checked> Active</label><div class="actions"><button id="c008AffSave" class="aqua">Save partner</button><button id="c008AffClear">Clear</button></div><p class="muted">Referral URLs use <code>/ref/CODE</code>. Clicks are aggregate; a registered account is attributed once after sign-in.</p></div><div class="card span7"><h3>Partner ledger</h3>${rows}</div></div></div>`);
+    const clear=()=>{document.querySelector('#c008AffId').value='';document.querySelector('#c008AffLabel').value='';document.querySelector('#c008AffCode').value='';document.querySelector('#c008AffLanding').value='/';document.querySelector('#c008AffActive').checked=true};
+    document.querySelector('#c008AffClear').onclick=clear;
+    document.querySelector('#c008AffSave').onclick=async()=>{const payload={id:document.querySelector('#c008AffId').value||undefined,label:document.querySelector('#c008AffLabel').value,code:document.querySelector('#c008AffCode').value,landing_path:document.querySelector('#c008AffLanding').value,active:document.querySelector('#c008AffActive').checked};try{await post('/api/admin/affiliate',payload);await admin()}catch(e){alert(e.message)}};
+    document.querySelectorAll('.c008-aff-edit').forEach(btn=>btn.onclick=()=>{const row=btn.closest('.c008-aff-row');document.querySelector('#c008AffId').value=row.dataset.id;document.querySelector('#c008AffLabel').value=row.dataset.label;document.querySelector('#c008AffCode').value=row.dataset.code;document.querySelector('#c008AffLanding').value=row.dataset.landing;document.querySelector('#c008AffActive').checked=row.dataset.active==='1';document.querySelector('#c008AffiliateControl').scrollIntoView({behavior:'smooth'})});
+    document.querySelectorAll('.c008-aff-archive').forEach(btn=>btn.onclick=async()=>{const row=btn.closest('.c008-aff-row');try{await post('/api/admin/affiliate',{action:'archive',id:row.dataset.id});await admin()}catch(e){alert(e.message)}});
+  }catch(e){console.warn('affiliate admin unavailable',e)}
+};
