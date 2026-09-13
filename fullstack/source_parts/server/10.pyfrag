@@ -1,0 +1,116 @@
+
+# C007 final non-provider controls (A006/A066/A067/A069).
+# MFA uses a deployment-held Base32 TOTP secret; the application database never stores it.
+import base64,struct,gzip
+from pathlib import Path as _Path
+
+_ops=db()
+try:
+    idcol='SERIAL PRIMARY KEY' if getattr(_ops,'postgres',False) else 'INTEGER PRIMARY KEY AUTOINCREMENT'
+    _ops.execute(f'''CREATE TABLE IF NOT EXISTS operational_job_runs(
+      id {idcol},job_name TEXT NOT NULL,status TEXT NOT NULL,details_json TEXT NOT NULL DEFAULT '{{}}',started_at TEXT NOT NULL,finished_at TEXT NOT NULL
+    )''')
+    _ops.execute('CREATE INDEX IF NOT EXISTS idx_job_runs_name ON operational_job_runs(job_name,id)')
+    _ops.execute(f'''CREATE TABLE IF NOT EXISTS api_error_events(
+      id {idcol},path TEXT NOT NULL,status_code INTEGER NOT NULL,error_code TEXT NOT NULL,created_at TEXT NOT NULL
+    )''')
+    _ops.execute('CREATE INDEX IF NOT EXISTS idx_api_errors_created ON api_error_events(created_at,id)')
+    _ops.execute(f'''CREATE TABLE IF NOT EXISTS backup_manifests(
+      id {idcol},backup_kind TEXT NOT NULL,path TEXT NOT NULL,status TEXT NOT NULL,table_count INTEGER NOT NULL,row_count INTEGER NOT NULL,created_by INTEGER NOT NULL,created_at TEXT NOT NULL
+    )''')
+    _ops.commit()
+finally:_ops.close()
+
+def _totp_secret():return clean(os.environ.get('EGM_OWNER_TOTP_SECRET',''),256).replace(' ','').upper()
+def _totp_code(secret,at=None,step=30):
+    try:
+        s=secret+'='*((8-len(secret)%8)%8);key=base64.b32decode(s,casefold=True);counter=int((at or time.time())//step);msg=struct.pack('>Q',counter);dig=hmac.new(key,msg,hashlib.sha1).digest();off=dig[-1]&15;num=(struct.unpack('>I',dig[off:off+4])[0]&0x7fffffff)%1000000;return f'{num:06d}'
+    except Exception:return ''
+def _verify_totp(secret,code):
+    code=clean(code,12)
+    if not secret or not re.fullmatch(r'\d{6}',code):return False
+    t=time.time()
+    return any(hmac.compare_digest(_totp_code(secret,t+(offset*30)),code) for offset in (-1,0,1))
+
+def _record_job(name,status,details,started):
+    con=db();con.execute('INSERT INTO operational_job_runs(job_name,status,details_json,started_at,finished_at) VALUES(?,?,?,?,?)',(name,status,json.dumps(details or {},separators=(',',':')),started,now()));con.commit();con.close()
+
+def _backup_tables():
+    return ('users','forum_threads','forum_replies','blog_posts','blog_comments','reports','surveys','survey_questions','survey_responses','survey_answers','gameplay_sessions','tips','live_sessions','normalized_events','coaching_experiments','admin_features','checklist','return_features','content_categories','content_tags','homepage_settings','announcements','editorial_schedule','moderator_notes')
+
+def _logical_backup(actor):
+    started=now();root=_Path(os.environ.get('EGM_BACKUP_DIR') or str(ROOT/'data'/'backups'));root.mkdir(parents=True,exist_ok=True);stamp=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ');path=root/f'egm4000-logical-{stamp}.json.gz';con=db();payload={'schema':'egm.backup.logical.v1','createdAt':started,'tables':{}};total=0
+    try:
+        for table in _backup_tables():
+            if table=='users':rows=rowsdict(con.execute('SELECT id,username,email,role,display_name,bio,favorite_platform,skill_focus,joined_at,status,is_synthetic FROM users ORDER BY id').fetchall())
+            else:rows=rowsdict(con.execute(f'SELECT * FROM {table}').fetchall())
+            payload['tables'][table]=rows;total+=len(rows)
+        raw=json.dumps(payload,default=str,separators=(',',':')).encode();gzip.open(path,'wb').write(raw);con.execute('INSERT INTO backup_manifests(backup_kind,path,status,table_count,row_count,created_by,created_at) VALUES(?,?,?,?,?,?,?)',('sanitized_logical',str(path),'success',len(payload['tables']),total,actor,started));audit(con,actor,'logical_backup_created','backup','',{'path':str(path),'tables':len(payload['tables']),'rows':total});con.commit();con.close();return {'ok':True,'path':str(path),'table_count':len(payload['tables']),'row_count':total,'created_at':started}
+    except Exception:
+        con.rollback();con.close();raise
+
+# Capture API errors centrally without changing response semantics.
+_ops_json_base=App.json
+def _ops_json(self,obj,status=200,cookies=None):
+    if int(status)>=400:
+        try:
+            con=db();code=clean(obj.get('error') if isinstance(obj,dict) else 'http_error',100) or 'http_error';con.execute('INSERT INTO api_error_events(path,status_code,error_code,created_at) VALUES(?,?,?,?)',(clean(urlparse(self.path).path,180),int(status),code,now()));con.commit();con.close()
+        except Exception:pass
+    return _ops_json_base(self,obj,status,cookies)
+App.json=_ops_json
+
+_ops_get_base=App.do_GET
+def _ops_do_GET(self):
+    path=urlparse(self.path).path
+    if path=='/api/admin/mfa-status':
+        s=self.need(owner=True)
+        if not s:return
+        configured=bool(_totp_secret());return self.json({'schema':'egm.admin.mfa-status.v1','configured':configured,'method':'TOTP' if configured else None,'secretLocation':'deployment_environment' if configured else None,'databaseStoresSecret':False})
+    if path=='/api/admin/jobs':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();rows=rowsdict(con.execute('SELECT * FROM operational_job_runs ORDER BY id DESC LIMIT 100').fetchall());scheduled=scalar(con,"SELECT COUNT(*) FROM editorial_schedule WHERE status='scheduled'");con.close();return self.json({'schema':'egm.admin.jobs.v1','registered':[{'name':'scheduled_blog_publish','pending':scheduled}],'recent_runs':rows})
+    if path=='/api/admin/api-errors':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();recent=rowsdict(con.execute('SELECT * FROM api_error_events ORDER BY id DESC LIMIT 200').fetchall());by_code=rowsdict(con.execute('SELECT status_code,error_code,COUNT(*) count FROM api_error_events GROUP BY status_code,error_code ORDER BY count DESC,status_code').fetchall());con.close();return self.json({'schema':'egm.admin.api-errors.v1','recent':recent,'summary':by_code})
+    if path=='/api/admin/backup-status':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();last=rowdict(con.execute('SELECT * FROM backup_manifests ORDER BY id DESC LIMIT 1').fetchone());count=scalar(con,'SELECT COUNT(*) FROM backup_manifests');con.close();return self.json({'schema':'egm.admin.backup-status.v1','backup_count':count,'last':last,'configuredDirectory':os.environ.get('EGM_BACKUP_DIR') or str(ROOT/'data'/'backups'),'durableStorageExplicitlyConfigured':bool(os.environ.get('EGM_BACKUP_DIR')),'excludes':['password_hash','salt','auth_sessions','mobile_tokens']})
+    return _ops_get_base(self)
+App.do_GET=_ops_do_GET
+
+_ops_post_base=App.do_POST
+def _ops_do_POST(self):
+    path=urlparse(self.path).path
+    if path=='/api/login' and _totp_secret():
+        raw=self.rfile.read(int(self.headers.get('Content-Length','0') or 0));self.rfile=io.BytesIO(raw)
+        try:b=json.loads(raw or b'{}')
+        except Exception:b={}
+        username=clean(b.get('username'),60);con=db();u=rowdict(con.execute('SELECT * FROM users WHERE username=?',(username,)).fetchone())
+        if u and u.get('role')=='owner':
+            ip,_=self.client_key()
+            if not rate(LOGIN_BUCKET,ip,12,900):con.close();return self.json({'error':'rate_limited'},429)
+            if u['status']!='active' or not verify(str(b.get('password','')),u['password_hash'],u['salt']):con.close();return self.json({'error':'invalid_credentials'},401)
+            if not _verify_totp(_totp_secret(),b.get('totp')):con.close();return self.json({'error':'mfa_required','method':'TOTP'},401)
+            tok=secrets.token_urlsafe(32);csrf=secrets.token_urlsafe(24);exp=(datetime.now(timezone.utc)+timedelta(hours=12)).replace(microsecond=0).isoformat();con.execute('INSERT INTO auth_sessions(token,user_id,csrf,created_at,expires_at) VALUES(?,?,?,?,?)',(tok,u['id'],csrf,now(),exp));audit(con,u['id'],'login_mfa_verified','user',u['id']);con.commit();con.close();cookie=f'egm_session={tok}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200'+('; Secure' if SECURE else '');return self.json({'ok':True,'mfa':True},cookies=[cookie])
+        con.close()
+    if path=='/api/admin/run-jobs':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        name=clean(b.get('job_name') or 'scheduled_blog_publish',80)
+        if name!='scheduled_blog_publish':return self.json({'error':'unknown_job'},400)
+        started=now();con=db()
+        try:published=_publish_due(con);con.close();details={'published_due':published};_record_job(name,'success',details,started);return self.json({'ok':True,'job_name':name,**details})
+        except Exception as e:
+            try:con.close()
+            except Exception:pass
+            _record_job(name,'failed',{'error':clean(str(e),200)},started);return self.json({'error':'job_failed'},500)
+    if path=='/api/admin/create-backup':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        try:return self.json(_logical_backup(s['id']),201)
+        except Exception as e:return self.json({'error':'backup_failed','detail':clean(str(e),200)},500)
+    return _ops_post_base(self)
+App.do_POST=_ops_do_POST
