@@ -1,0 +1,43 @@
+{
+  "schema": "smartpickshop.egm4000.admin100-verification.v4",
+  "verifiedAt": "2026-09-13",
+  "repository": "anastaysia94-sudo/EGM4000-Android",
+  "headCommit": "b718022b08bdc9697e83bb09cbb9f060b47d5c97",
+  "status": {
+    "total": 100,
+    "implemented": 65,
+    "modelled": 10,
+    "providerConfigurationRequired": 25
+  },
+  "newlyVerified": {
+    "A004": "Owner password recovery controls",
+    "A009": "Owner active-session revocation",
+    "A027": "Bulk moderation actions",
+    "A028": "Moderator notes",
+    "A062": "F.S.A. duplicate-event diagnostics"
+  },
+  "verification": {
+    "fullstackSmoke": {"runId": 34757518239, "conclusion": "success"},
+    "coreLoopIntegration": {"runId": 34757518187, "conclusion": "success"},
+    "portableDockerSmoke": {"runId": 34757518189, "conclusion": "success"},
+    "postgresCompatibility": {"runId": 34757518200, "conclusion": "success"}
+  },
+  "behavioralChecks": [
+    "owner recovery token replaces password and invalidates web/mobile sessions",
+    "owner can enumerate safe session fingerprints and revoke all other sessions",
+    "bulk moderation hides/restores validated community content and reports true changed counts",
+    "moderator notes persist and read back through owner-only APIs",
+    "duplicate authenticated F.S.A. source event IDs return HTTP 409 before normalized insertion",
+    "duplicate F.S.A. rejections persist to owner diagnostics"
+  ],
+  "remainingModelled": ["A006","A035","A036","A037","A038","A039","A040","A066","A067","A069"],
+  "providerDependent": "A071-A095",
+  "safety": {
+    "fsaSeparateOwnedProduct": true,
+    "exactTelemetryBridgeOnly": true,
+    "virtualNonCashCreditsOnly": true,
+    "noProfitGuarantees": true,
+    "noRandomOutcomeCertainty": true,
+    "noThirdPartyCredentialStorage": true
+  }
+}
