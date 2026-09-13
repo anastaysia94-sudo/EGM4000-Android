@@ -1,6 +1,6 @@
 {
   "schema": "smartpickshop.egm4000.continuity.v1",
-  "updatedAt": "2026-09-13T12:00:00Z",
+  "updatedAt": "2026-09-13T18:12:00Z",
   "repository": "anastaysia94-sudo/EGM4000-Android",
   "project": {
     "name": "EGM4000 / EduGameMaster 4000",
@@ -19,7 +19,7 @@
   },
   "products": {
     "egm4000": {
-      "status": "Android v0.2 debug beta + persistent full-stack Web/PWA with integrated C006 Tips Center, C014 coaching experiment comparison, and audited C007 Admin 100 registry",
+      "status": "Android v0.2 debug beta + persistent full-stack Web/PWA with integrated C006 Tips Center, C014 coaching experiment comparison, completed C009 Return User Lab, and audited C007 Admin 100 registry",
       "role": "Gameplay intelligence, authorized evidence logging, normalized metrics/replay, confidence-calibrated coaching, persistent follow-up comparison, community, privacy-safe surveys, owner administration, and safe research.",
       "paths": ["android-egm4000/", "web/", "fullstack/", "shared/", "docs/"]
     },
@@ -41,6 +41,7 @@
       "C004": "Community forum/blog with persistent backend, registered-user posting, reports, owner moderation and audit events.",
       "C005": "Privacy-preserving visitor surveys with consent, first/returning/registered targeting, pseudonymous visitor identifiers, persistent responses and owner builder.",
       "C006": "Session-derived Tips Center integrated with the shared full-stack core loop. Live/Android-synced evidence produces persistent coaching with provenance/evidence type, confidence, sample size, metrics and uncertainty.",
+      "C009": "All 49 canonical return-user features are implemented and testable. My Evidence Lab completes tip ratings, historical personal-best and efficiency views, fatigue/pause safeguards, safe evidence-use goals and achievements, coach inbox, screenshot/video/voice evidence intake, smart tags, saved views, and notification controls. Synthetic users remain excluded from real-user adoption counts.",
       "C010": "Shared F.S.A. exact-telemetry fixture and validator added; integration CI validates the fixture and normalized contract.",
       "C011": "Android Evidence Review v0.2 account-aware sync client is implemented; its legacy event aliases are normalized by the server into the shared core-loop vocabulary.",
       "C013": "EGM4000-side authenticated F.S.A. telemetry bridge implemented with deployment-secret authentication, stable external-session mapping, duplicate protection and virtual/non-cash credit enforcement.",
@@ -49,8 +50,7 @@
     "incomplete": {
       "C003": "Production owner/auth boundary exists in the full-stack foundation but still requires deployment hardening, recovery controls, production secret/provider configuration and final security validation.",
       "C007": "Admin 100 now has a canonical 100-capability registry with real titles, nine categories, owner-visible evidence notes and CI integrity checks. Verified current state: 38 implemented, 37 modelled, 25 provider-configuration-required. Full end-to-end completion remains outstanding.",
-      "C008": "A071-A095 monetization capabilities are explicitly named and remain provider-configuration-required; they are not yet all end-to-end implemented.",
-      "C009": "Return-user foundation is implemented with 49 canonical names, 30 verified implemented features, 19 honestly modelled features, a personalized return dashboard, and real first-party adoption events. Full R001-R049 completion remains outstanding."
+      "C008": "A071-A095 monetization capabilities are explicitly named and remain provider-configuration-required; they are not yet all end-to-end implemented."
     }
   },
   "admin100": {
@@ -63,6 +63,19 @@
     "modelled": 37,
     "providerConfigurationRequired": 25,
     "rule": "A capability is not marked implemented unless a current route, persisted datastore, UI, or safety control concretely backs the claim. Planned/provider-dependent capabilities stay visibly incomplete."
+  },
+  "returnUser49": {
+    "registry": "fullstack/return_registry.py",
+    "workspaceEngine": "fullstack/return_workspace.py",
+    "ownerAdoptionEndpoint": "GET /api/admin/return-adoption",
+    "workspaceEndpoint": "GET /api/return/workspace",
+    "workspaceUi": "My Evidence Lab",
+    "total": 49,
+    "implemented": 49,
+    "modelled": 0,
+    "implementationCommit": "7d33d5beab69077be02e33eaf981ee605f644575",
+    "verifiedCodeCommit": "cf93c32a3f8eaa8e422839162fab01e3f55e6146",
+    "rule": "Return-user analytics describe authorized recorded history only. Personal bests, efficiency summaries, time patterns, ratings, goals and achievements must not be framed as predictions of random outcomes, causal proof, or profit guarantees."
   },
   "coreLoopIntegration": {
     "analysisSchema": "egm.analysis.v1",
@@ -102,12 +115,19 @@
   },
   "verification": {
     "workflow": ".github/workflows/integration-core-loop.yml",
-    "lastVerifiedRunId": 34026860728,
+    "lastVerifiedRunId": 34773829901,
     "lastVerifiedConclusion": "success",
     "admin100Workflow": ".github/workflows/fullstack-smoke.yml",
-    "admin100VerifiedRunId": 34027204091,
+    "admin100VerifiedRunId": 34773829950,
     "admin100VerifiedConclusion": "success",
-    "verifiedChecks": ["F.S.A. exact-telemetry fixture validation", "full-stack core-loop integration", "persistent C006 tip generation", "C014 baseline target upgrade", "C014 same-platform follow-up linking", "C014 Improved behavior classification", "random-credit outcome exclusion from experiment scoring", "Admin 100 exactly 100 named capabilities", "Admin 100 contains no generic placeholder titles", "Admin 100 audited 38 implemented / 37 modelled / 25 provider-configuration-required split", "Admin 100 spans nine explicit categories", "A057 coaching experiment comparison is implemented", "A071 premium subscription plans remains incomplete/provider-dependent", "public app assembly", "fresh database bootstrap", "public API smoke", "Python syntax check", "JavaScript syntax check"]
+    "returnUserWorkflow": ".github/workflows/return-features-smoke.yml",
+    "returnUserVerifiedRunId": 34773829944,
+    "returnUserVerifiedConclusion": "success",
+    "postgresVerifiedRunId": 34773829951,
+    "postgresVerifiedConclusion": "success",
+    "dockerVerifiedRunId": 34773829921,
+    "dockerVerifiedConclusion": "success",
+    "verifiedChecks": ["F.S.A. exact-telemetry fixture validation", "full-stack core-loop integration", "persistent C006 tip generation", "C014 baseline target upgrade", "C014 same-platform follow-up linking", "C014 Improved behavior classification", "random-credit outcome exclusion from experiment scoring", "Admin 100 exactly 100 named capabilities", "Admin 100 contains no generic placeholder titles", "Admin 100 audited 38 implemented / 37 modelled / 25 provider-configuration-required split", "Admin 100 spans nine explicit categories", "A057 coaching experiment comparison is implemented", "A071 premium subscription plans remains incomplete/provider-dependent", "C009 R001-R049 exactly 49 canonical implemented features", "C009 Return User Lab authenticated workspace", "C009 CSRF-protected tip ratings, safe goals, pause, preferences, notes and saved views", "C009 screenshot/video/voice evidence upload validation and authenticated retrieval", "C009 smart-tag and media-review persistence", "PostgreSQL/Supabase compatibility", "portable production-style Docker smoke", "public app assembly", "fresh database bootstrap", "public API smoke", "Python syntax check", "JavaScript syntax check"]
   },
   "safetyBoundaries": {
     "noCredentialStorage": true,
@@ -122,7 +142,6 @@
   "nextMilestones": [
     {"id": "C007", "title": "Implement remaining Admin 100 capabilities", "definitionOfDone": "All A001-A100 capabilities are individually implemented/tested or explicitly marked incomplete; no model-only feature is presented as complete. Current audit baseline is 38/100 implemented."},
     {"id": "C008", "title": "Implement A071-A095 monetization", "definitionOfDone": "Exactly 25 monetization capabilities are implemented inside Admin 100 with safe, non-deceptive controls and measurement."},
-    {"id": "C009", "title": "Complete remaining 19 return-user features", "definitionOfDone": "All R001-R049 features have testable end-user behavior and actual adoption/retention is measured without synthetic or guaranteed usage claims. Current verified baseline: 30 implemented / 19 modelled."},
     {"id": "C003", "title": "Production auth/deployment hardening", "definitionOfDone": "Production secrets, sole-owner recovery/security controls, HTTPS deployment, rate/CSRF/session validation, backups, monitoring and final security QA are verified."},
     {"id": "C015", "title": "Physical Android + public deployment QA", "definitionOfDone": "Canonical HTTPS backend is configured in Android, APK/AAB is signed, Web/PWA and Android are tested on real devices, and production monitoring/backups are active."},
     {"id": "C016", "title": "Multi-session coaching effectiveness trends", "definitionOfDone": "Completed C014 comparisons roll into confidence-calibrated multi-session trends without turning correlations or random outcomes into causal claims."}
