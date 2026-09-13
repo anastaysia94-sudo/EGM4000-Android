@@ -12,6 +12,7 @@ This repository is the authoritative EGM4000 Android + Web/PWA continuation repo
 - Persistent full-stack community/forum/blog backend with registered-user posting, replies/comments, reports, owner moderation, and audit events.
 - Privacy-safe first/returning/registered surveys with consent, pseudonymous visitor identifiers, persistent responses, and owner survey builder.
 - Responsive installable Web/PWA with Tips Center, Community, Blog, Surveys, Live Lab, account registration/login, and owner Admin controls.
+- **C002 guided first-run tutorial:** nine-step responsive walkthrough covering setup, session logging, authorized event monitoring, analytics/replay, evidence-labeled AI Tips, Bankroll Guard, Community, privacy/surveys, and the safe Research Lab. Tutorial progress resumes locally, supports Back/Next/Skip/Finish, keyboard navigation, direct module jumps, and can be relaunched from the main shell.
 - 237 clearly synthetic seed users, 948 synthetic gameplay sessions, 948 evidence-linked seed tips, and seeded community content for testing.
 - Normalized gameplay evidence, live metrics, replay, learned baselines, C006 Tips Center, and the F.S.A. exact-telemetry boundary.
 
