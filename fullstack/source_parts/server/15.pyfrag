@@ -1,0 +1,64 @@
+
+# C008 A080: first-party affiliate attribution without visitor fingerprinting.
+from commercial_access import admin_affiliates,archive_affiliate,migrate_commercial_access,record_affiliate_signup,resolve_affiliate_click,save_affiliate
+
+_c008b=db()
+try:migrate_commercial_access(_c008b)
+finally:_c008b.close()
+
+_C008_AFFILIATE_FIELDS={'id','code','label','landing_path','active','action'}
+
+def _c008_affiliate_error(self,exc):
+    code=str(exc);status=404 if code=='affiliate_not_found' else 400
+    return self.json({'error':code},status)
+
+_c008b_get_base=App.do_GET
+def _c008b_do_GET(self):
+    parsed=urlparse(self.path);path=parsed.path
+    if path=='/api/admin/affiliates':
+        s=self.need(owner=True)
+        if not s:return
+        con=db()
+        try:payload=admin_affiliates(con)
+        finally:con.close()
+        return self.json(payload)
+    if path.startswith('/ref/'):
+        code=path[len('/ref/'):].strip('/')[:48]
+        con=db()
+        try:partner=resolve_affiliate_click(con,code)
+        finally:con.close()
+        if not partner:return self.json({'error':'affiliate_not_found'},404)
+        separator='&' if '?' in partner['landingPath'] else '?'
+        location=partner['landingPath']+separator+'ref='+partner['code']
+        self.send_response(302);self.send_header('Location',location);self.send_header('Cache-Control','no-store');self.send_common();self.end_headers();return
+    return _c008b_get_base(self)
+App.do_GET=_c008b_do_GET
+
+_c008b_post_base=App.do_POST
+def _c008b_do_POST(self):
+    path=urlparse(self.path).path
+    if path=='/api/affiliate/claim':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        con=db()
+        try:
+            code=clean(b.get('code'),48);attributed=record_affiliate_signup(con,code,s['id'])
+            if attributed:audit(con,s['id'],'affiliate_attributed','user',s['id'],{'code':code})
+            con.commit()
+        finally:con.close()
+        return self.json({'ok':True,'attributed':bool(attributed)})
+    if path=='/api/admin/affiliate':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        unknown=set(b)-_C008_AFFILIATE_FIELDS
+        if unknown:return self.json({'error':'unsupported_affiliate_fields','fields':sorted(str(x) for x in unknown)},400)
+        con=db()
+        try:
+            if clean(b.get('action'),20)=='archive':partner=archive_affiliate(con,b.get('id'));action='affiliate_archived'
+            else:partner=save_affiliate(con,b);action='affiliate_saved'
+            audit(con,s['id'],action,'affiliate_partner',partner['id'],{'code':partner['code'],'active':partner['active']});con.commit()
+        except ValueError as exc:
+            con.rollback();con.close();return _c008_affiliate_error(self,exc)
+        con.close();return self.json({'ok':True,'partner':partner})
+    return _c008b_post_base(self)
+App.do_POST=_c008b_do_POST
