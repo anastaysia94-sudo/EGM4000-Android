@@ -27,10 +27,11 @@ jobs:
       - name: Assemble and syntax-check
         env: {EGM_ASSEMBLE_ONLY: "1"}
         run: |
-          python -m py_compile bootstrap_db.py storage.py live_intelligence.py admin_registry.py server.py
+          python -m py_compile bootstrap_db.py storage.py live_intelligence.py admin_registry.py monetization_assets.py server.py
           python server.py
           node --check static/app.js
           python test_return_features.py
+          python test_monetization_assets.py
       - name: Fresh database and Admin 100 integrity
         run: |
           rm -rf data
@@ -45,8 +46,8 @@ jobs:
           rows=c.execute('SELECT id,title,category,implementation_status FROM admin_features ORDER BY id').fetchall()
           assert len(rows)==100
           statuses={s:sum(1 for r in rows if r[3]==s) for s in {'implemented','modelled','provider_configuration_required'}}
-          assert statuses=={'implemented':75,'modelled':0,'provider_configuration_required':25},statuses
-          for fid in ('A004','A006','A008','A009','A027','A028','A034','A035','A036','A037','A038','A039','A040','A041','A042','A043','A044','A045','A058','A059','A060','A061','A062','A065','A066','A067','A069','A098'):
+          assert statuses=={'implemented':80,'modelled':0,'provider_configuration_required':20},statuses
+          for fid in ('A004','A006','A008','A009','A027','A028','A034','A035','A036','A037','A038','A039','A040','A041','A042','A043','A044','A045','A058','A059','A060','A061','A062','A065','A066','A067','A069','A079','A081','A090','A091','A093','A098'):
               assert c.execute('SELECT done FROM checklist WHERE id=?',(fid,)).fetchone()[0]==1,fid
           print('Admin 100 verified',statuses)
           PY
