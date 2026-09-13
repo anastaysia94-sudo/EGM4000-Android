@@ -1,0 +1,105 @@
+name: EGM4000 C008 Custom Report Packages
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-custom-reports-smoke.yml"
+  pull_request:
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-custom-reports-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  custom-report-packages:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fullstack
+    env:
+      EGM_OWNER_PASSWORD: ${{ github.sha }}
+      EGM_PORT: "8044"
+      TEST_USER_PASSWORD: "C008-Report-Test-Strong-2026"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install runtime dependency
+        run: pip install -r requirements.txt
+      - name: Contract and syntax checks
+        env:
+          EGM_ASSEMBLE_ONLY: "1"
+        run: |
+          python -m py_compile bootstrap_db.py storage.py custom_reports.py server.py
+          python server.py
+          node --check static/app.js
+          python test_custom_reports.py
+      - name: HTTP smoke package request and fulfillment
+        run: |
+          rm -rf data
+          python bootstrap_db.py --force
+          python server.py > /tmp/egm4000-a087.log 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 25); do
+            if curl -fsS http://127.0.0.1:8044/api/health | grep -q 'egm.event.v1'; then ready=1; break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then cat /tmp/egm4000-a087.log >&2 || true; exit 1; fi
+            sleep 1
+          done
+          test "$ready" -eq 1
+
+          python - <<'PY' > /tmp/owner-login.json
+          import json,os
+          print(json.dumps({'username':'EGM4000Owner','password':os.environ['EGM_OWNER_PASSWORD']}))
+          PY
+          curl -fsS -c /tmp/owner.cookies -H 'Content-Type: application/json' --data-binary @/tmp/owner-login.json http://127.0.0.1:8044/api/login | grep -q '"ok": true'
+          curl -fsS -b /tmp/owner.cookies http://127.0.0.1:8044/api/me > /tmp/owner-me.json
+          OWNER_CSRF=$(python -c "import json;print(json.load(open('/tmp/owner-me.json'))['csrf'])")
+
+          curl -fsS -b /tmp/owner.cookies -H "X-CSRF-Token: $OWNER_CSRF" -H 'Content-Type: application/json' -d '{"title":"Personal Evidence Deep Dive","description":"Human-reviewed analysis of recorded evidence.","deliverables":["30-day review","Uncertainty notes","Tracking checklist"],"price_label":"$49 external checkout","turnaround_label":"2 business days","status":"active"}' http://127.0.0.1:8044/api/admin/custom-report-package > /tmp/pkg.json
+          grep -q '"ok": true' /tmp/pkg.json
+          PACKAGE_ID=$(python -c "import json;print(json.load(open('/tmp/pkg.json'))['package']['id'])")
+          curl -fsS http://127.0.0.1:8044/api/custom-report-packages | grep -q 'does not prove payment'
+
+          python - <<'PY' > /tmp/register.json
+          import json,os
+          print(json.dumps({'display_name':'Report Test','username':'report_test','email':'report-test@example.test','password':os.environ['TEST_USER_PASSWORD'],'favorite_platform':'Fire Kirin','skill_focus':'Evidence review'}))
+          PY
+          curl -fsS -H 'Content-Type: application/json' --data-binary @/tmp/register.json http://127.0.0.1:8044/api/register | grep -q '"ok": true'
+          python - <<'PY' > /tmp/user-login.json
+          import json,os
+          print(json.dumps({'username':'report_test','password':os.environ['TEST_USER_PASSWORD']}))
+          PY
+          curl -fsS -c /tmp/user.cookies -H 'Content-Type: application/json' --data-binary @/tmp/user-login.json http://127.0.0.1:8044/api/login | grep -q '"ok": true'
+          curl -fsS -b /tmp/user.cookies http://127.0.0.1:8044/api/me > /tmp/user-me.json
+          USER_CSRF=$(python -c "import json;print(json.load(open('/tmp/user-me.json'))['csrf'])")
+          curl -fsS -b /tmp/user.cookies -H "X-CSRF-Token: $USER_CSRF" -H 'Content-Type: application/json' -d "{\"package_id\":\"$PACKAGE_ID\",\"request_note\":\"Focus on pacing and breaks.\"}" http://127.0.0.1:8044/api/custom-report-request > /tmp/request.json
+          grep -q '"paymentStatus": "external_unverified"' /tmp/request.json
+          REQUEST_ID=$(python -c "import json;print(json.load(open('/tmp/request.json'))['request']['id'])")
+          duplicate=$(curl -sS -o /tmp/duplicate.json -w '%{http_code}' -b /tmp/user.cookies -H "X-CSRF-Token: $USER_CSRF" -H 'Content-Type: application/json' -d "{\"package_id\":\"$PACKAGE_ID\"}" http://127.0.0.1:8044/api/custom-report-request)
+          test "$duplicate" = "409"
+
+          fakepaid=$(curl -sS -o /tmp/fakepaid.json -w '%{http_code}' -b /tmp/owner.cookies -H "X-CSRF-Token: $OWNER_CSRF" -H 'Content-Type: application/json' -d "{\"id\":\"$REQUEST_ID\",\"status\":\"accepted\",\"payment_status\":\"provider_verified\",\"provider_verification\":true}" http://127.0.0.1:8044/api/admin/custom-report-request)
+          test "$fakepaid" = "409"
+          grep -q 'billing_provider_confirmation_not_available' /tmp/fakepaid.json
+
+          nodoc=$(curl -sS -o /tmp/nodoc.json -w '%{http_code}' -b /tmp/owner.cookies -H "X-CSRF-Token: $OWNER_CSRF" -H 'Content-Type: application/json' -d "{\"id\":\"$REQUEST_ID\",\"status\":\"delivered\",\"payment_status\":\"external_unverified\"}" http://127.0.0.1:8044/api/admin/custom-report-request)
+          test "$nodoc" = "400"
+          grep -q 'delivery_content_required' /tmp/nodoc.json
+
+          curl -fsS -b /tmp/owner.cookies -H "X-CSRF-Token: $OWNER_CSRF" -H 'Content-Type: application/json' -d "{\"id\":\"$REQUEST_ID\",\"status\":\"delivered\",\"payment_status\":\"external_unverified\",\"owner_note\":\"Reviewed\",\"delivery_note\":\"Your report is ready.\",\"delivery_url\":\"https://example.com/report.pdf\"}" http://127.0.0.1:8044/api/admin/custom-report-request | grep -q '"status": "delivered"'
+          curl -fsS -b /tmp/user.cookies http://127.0.0.1:8044/api/my-custom-report-requests > /tmp/mine.json
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/mine.json'))
+          assert x['requests'][0]['status']=='delivered'
+          assert x['requests'][0]['deliveryUrl']=='https://example.com/report.pdf'
+          assert x['requests'][0]['paymentStatus']=='external_unverified'
+          PY
