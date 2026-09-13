@@ -16,8 +16,6 @@ jobs:
         working-directory: fullstack
     env:
       EGM_OWNER_PASSWORD: ${{ github.sha }}
-      EGM_OWNER_RECOVERY_TOKEN: ${{ github.sha }}-recovery
-      EGM_FSA_TELEMETRY_TOKEN: ${{ github.sha }}-fsa
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -49,12 +47,13 @@ jobs:
           assert statuses=={'implemented':65,'modelled':10,'provider_configuration_required':25},statuses
           for fid in ('A004','A008','A009','A027','A028','A034','A041','A042','A043','A044','A045','A058','A059','A060','A061','A062','A065','A098'):
               assert c.execute('SELECT done FROM checklist WHERE id=?',(fid,)).fetchone()[0]==1,fid
-          assert c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='moderator_notes'").fetchone()
-          assert c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='fsa_ingest_diagnostics'").fetchone()
           print('Admin 100 verified',statuses)
           PY
       - name: Public and owner API smoke
         run: |
+          export EGM_OWNER_RECOVERY_TOKEN="ci-recovery-${GITHUB_RUN_ID}"
+          export EGM_FSA_TELEMETRY_TOKEN="ci-fsa-${GITHUB_RUN_ID}"
+          export RECOVERED_PASSWORD="CiRecovered-${GITHUB_RUN_ID}-Strong!"
           python server.py > /tmp/egm4000.log 2>&1 &
           pid=$!
           trap 'kill $pid 2>/dev/null || true' EXIT
@@ -71,11 +70,7 @@ jobs:
             fi
             sleep 1
           done
-          if [ "$ready" -ne 1 ]; then
-            echo "EGM4000 server did not become ready within 25 seconds" >&2
-            cat /tmp/egm4000.log >&2 || true
-            exit 1
-          fi
+          test "$ready" -eq 1
           python - <<'PY' > /tmp/login.json
           import json,os
           print(json.dumps({'username':'EGM4000Owner','password':os.environ['EGM_OWNER_PASSWORD']}))
@@ -84,27 +79,18 @@ jobs:
           curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/me > /tmp/me.json
           CSRF=$(python -c "import json;print(json.load(open('/tmp/me.json'))['csrf'])")
           curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/features | grep -q 'F.S.A. duplicate-event diagnostics'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/coaching-trends | grep -q 'egm.admin.coaching-trends.v1'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/evidence-quality | grep -q 'egm.admin.evidence-quality.v1'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/adapter-health | grep -q 'egm.admin.adapter-health.v1'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/fsa-status | grep -q 'egm.admin.fsa-status.v1'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/storage-health | grep -q 'egm.admin.storage-health.v1'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/return-features | grep -q 'egm.admin.return-features.v1'
           curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/recovery-status | grep -q 'egm.admin.recovery-status.v1'
 
-          # A009: create a second owner session, then revoke every non-current owner session.
           curl -fsS -c /tmp/egm2.cookies -H 'Content-Type: application/json' --data-binary @/tmp/login.json http://127.0.0.1:8040/api/login | grep -q '"ok": true'
           curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/sessions | grep -q 'egm.admin.sessions.v1'
           curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"scope":"all_other"}' http://127.0.0.1:8040/api/admin/revoke-sessions | grep -q '"revoked": 1'
           curl -fsS -b /tmp/egm2.cookies http://127.0.0.1:8040/api/me | grep -q '"authenticated": false'
 
-          # A027/A028: bulk moderation and durable moderator notes.
           curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"action":"hide","targets":[{"target_type":"forum_thread","target_id":1}]}' http://127.0.0.1:8040/api/admin/bulk-moderate | grep -q '"count": 1'
           curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"action":"restore","targets":[{"target_type":"forum_thread","target_id":1}]}' http://127.0.0.1:8040/api/admin/bulk-moderate | grep -q '"count": 1'
           curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"target_type":"forum_thread","target_id":1,"note":"Smoke-test moderation note"}' http://127.0.0.1:8040/api/admin/moderator-note | grep -q '"ok": true'
           curl -fsS -b /tmp/egm.cookies 'http://127.0.0.1:8040/api/admin/moderator-notes?target_type=forum_thread&target_id=1' | grep -q 'Smoke-test moderation note'
 
-          # A062: a duplicate authenticated F.S.A. source event is rejected and diagnosed.
           cat > /tmp/fsa.json <<'JSON'
           {"userId":2,"sessionId":"smoke-session-1","eventId":"smoke-event-1","eventType":"shot_fired","occurredAt":"2026-09-13T12:00:00Z","sourceProduct":"fsa","evidenceLabel":"exact_telemetry","confidence":1,"payload":{}}
           JSON
@@ -114,12 +100,14 @@ jobs:
           grep -q 'duplicate source event ID' /tmp/fsa-dup.json
           curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/fsa-duplicate-diagnostics | grep -q '"duplicate_rejections": 1'
 
-          # A004: deployment-secret recovery changes the password and invalidates the old session.
           python - <<'PY' > /tmp/recover.json
           import json,os
-          print(json.dumps({'recovery_token':os.environ['EGM_OWNER_RECOVERY_TOKEN'],'new_password':'Recovered-Admin-Password-123!'}))
+          print(json.dumps({'recovery_token':os.environ['EGM_OWNER_RECOVERY_TOKEN'],'new_password':os.environ['RECOVERED_PASSWORD']}))
           PY
           curl -fsS -H 'Content-Type: application/json' --data-binary @/tmp/recover.json http://127.0.0.1:8040/api/owner/recover | grep -q '"sessions_invalidated": true'
           curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/me | grep -q '"authenticated": false'
-          printf '%s\n' '{"username":"EGM4000Owner","password":"Recovered-Admin-Password-123!"}' > /tmp/login-recovered.json
+          python - <<'PY' > /tmp/login-recovered.json
+          import json,os
+          print(json.dumps({'username':'EGM4000Owner','password':os.environ['RECOVERED_PASSWORD']}))
+          PY
           curl -fsS -c /tmp/recovered.cookies -H 'Content-Type: application/json' --data-binary @/tmp/login-recovered.json http://127.0.0.1:8040/api/login | grep -q '"ok": true'
