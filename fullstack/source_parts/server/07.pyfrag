@@ -1,5 +1,5 @@
 
-# C007 gameplay-intelligence owner diagnostics (A058-A060).
+# C007 gameplay-intelligence and platform owner diagnostics.
 from live_intelligence import ADAPTERS
 _c007_get_base=App.do_GET
 def _c007_intel_do_GET(self):
@@ -21,5 +21,19 @@ def _c007_intel_do_GET(self):
             if aid=='fsa' and not os.environ.get('EGM_FSA_TELEMETRY_TOKEN'):state='configuration_required'
             rows.append({**a,'events':events,'sessions':sessions,'last_event':last,'state':state})
         con.close();return self.json({'schema':'egm.admin.adapter-health.v1','adapters':rows,'exactTelemetryBoundary':'Only authenticated owned F.S.A. telemetry may use exact_telemetry.'})
+    if path=='/api/admin/fsa-status':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();events=scalar(con,"SELECT COUNT(*) FROM normalized_events WHERE platform='fsa'");sessions=scalar(con,"SELECT COUNT(*) FROM live_sessions WHERE platform='fsa'");links=scalar(con,'SELECT COUNT(*) FROM fsa_integration_sessions');last=rowdict(con.execute("SELECT event_time,evidence_type,confidence FROM normalized_events WHERE platform='fsa' ORDER BY id DESC LIMIT 1").fetchone());con.close();configured=bool(os.environ.get('EGM_FSA_TELEMETRY_TOKEN'));return self.json({'schema':'egm.admin.fsa-status.v1','configured':configured,'state':'ready' if configured else 'configuration_required','sessions':sessions,'events':events,'linked_external_sessions':links,'last_event':last,'exactTelemetryBoundary':'F.S.A. is a separate owned product; exact telemetry requires the authenticated bridge and virtual/non-cash credits.'})
+    if path=='/api/admin/storage-health':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();dialect='postgresql' if getattr(con,'postgres',False) else 'sqlite';probe=scalar(con,'SELECT 1');counts={t:scalar(con,f'SELECT COUNT(*) FROM {t}') for t in ('users','live_sessions','normalized_events','tips','coaching_experiments','audit_events')};con.close();return self.json({'schema':'egm.admin.storage-health.v1','ok':probe==1,'dialect':dialect,'counts':counts,'database_url_configured':bool(os.environ.get('DATABASE_URL'))})
+    if path=='/api/admin/return-features':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();rows=rowsdict(con.execute('SELECT id,title,implementation_status FROM return_features ORDER BY id').fetchall());summary={}
+        for r in rows:summary[r['implementation_status']]=summary.get(r['implementation_status'],0)+1
+        con.close();return self.json({'schema':'egm.admin.return-features.v1','total':len(rows),'summary':summary,'features':rows})
     return _c007_get_base(self)
 App.do_GET=_c007_intel_do_GET
