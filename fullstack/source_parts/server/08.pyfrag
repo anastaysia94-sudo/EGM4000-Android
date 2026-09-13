@@ -1,0 +1,103 @@
+
+# C007 security, moderation, and F.S.A. ingest diagnostics (A004/A009/A027/A028/A062).
+_c=db()
+try:
+    idcol='SERIAL PRIMARY KEY' if getattr(_c,'postgres',False) else 'INTEGER PRIMARY KEY AUTOINCREMENT'
+    _c.execute(f'''CREATE TABLE IF NOT EXISTS moderator_notes(
+      id {idcol},actor_user_id INTEGER NOT NULL,target_type TEXT NOT NULL,target_id INTEGER NOT NULL,
+      note TEXT NOT NULL,created_at TEXT NOT NULL
+    )''')
+    _c.execute('CREATE INDEX IF NOT EXISTS idx_moderator_notes_target ON moderator_notes(target_type,target_id,created_at)')
+    _c.execute(f'''CREATE TABLE IF NOT EXISTS fsa_ingest_diagnostics(
+      id {idcol},external_session_id TEXT,event_id TEXT,reason TEXT NOT NULL,detail TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL
+    )''')
+    _c.execute('CREATE INDEX IF NOT EXISTS idx_fsa_diag_created ON fsa_ingest_diagnostics(created_at)')
+    _c.commit()
+finally:_c.close()
+
+_c007_security_get_base=App.do_GET
+def _c007_security_do_GET(self):
+    p=urlparse(self.path);path=p.path;q=parse_qs(p.query)
+    if path=='/api/admin/sessions':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();rows=rowsdict(con.execute('SELECT token,created_at,expires_at FROM auth_sessions WHERE user_id=? ORDER BY created_at DESC',(s['id'],)).fetchall());con.close()
+        out=[]
+        for r in rows:
+            fp=hashlib.sha256(r['token'].encode()).hexdigest()[:16]
+            out.append({'fingerprint':fp,'created_at':r['created_at'],'expires_at':r['expires_at'],'current':r['token']==s['token']})
+        return self.json({'schema':'egm.admin.sessions.v1','sessions':out,'expiration_enforced':True})
+    if path=='/api/admin/moderator-notes':
+        s=self.need(owner=True)
+        if not s:return
+        tt=clean(qval(q,'target_type',''),30);tid=int(qval(q,'target_id','0') or 0);con=db();rows=rowsdict(con.execute('SELECT id,actor_user_id,target_type,target_id,note,created_at FROM moderator_notes WHERE target_type=? AND target_id=? ORDER BY id DESC LIMIT 100',(tt,tid)).fetchall()) if tt and tid else [];con.close();return self.json({'schema':'egm.admin.moderator-notes.v1','notes':rows})
+    if path=='/api/admin/fsa-duplicate-diagnostics':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();rows=rowsdict(con.execute('SELECT id,external_session_id,event_id,reason,detail,created_at FROM fsa_ingest_diagnostics ORDER BY id DESC LIMIT 200').fetchall());duplicates=scalar(con,"SELECT COUNT(*) FROM fsa_ingest_diagnostics WHERE reason='duplicate_source_event'");con.close();return self.json({'schema':'egm.admin.fsa-duplicate-diagnostics.v1','duplicate_rejections':duplicates,'recent':rows,'rule':'Duplicate source event IDs are rejected before normalized-event insertion.'})
+    if path=='/api/admin/recovery-status':
+        s=self.need(owner=True)
+        if not s:return
+        return self.json({'schema':'egm.admin.recovery-status.v1','configured':bool(os.environ.get('EGM_OWNER_RECOVERY_TOKEN')),'method':'deployment_secret','session_invalidation':True})
+    return _c007_security_get_base(self)
+App.do_GET=_c007_security_do_GET
+
+_c007_security_post_base=App.do_POST
+def _c007_security_do_POST(self):
+    path=urlparse(self.path).path
+    if path=='/api/owner/recover':
+        ip,_=self.client_key()
+        if not rate(WRITE_BUCKET,'owner-recovery:'+ip,5,3600):return self.json({'error':'rate_limited'},429)
+        raw=self.rfile.read(int(self.headers.get('Content-Length','0') or 0))
+        try:b=json.loads(raw or b'{}')
+        except Exception:b={}
+        expected=os.environ.get('EGM_OWNER_RECOVERY_TOKEN','');supplied=clean(b.get('recovery_token'),500);password=str(b.get('new_password') or '')
+        if not expected:return self.json({'error':'owner_recovery_not_configured'},503)
+        if not supplied or not hmac.compare_digest(expected,supplied):return self.json({'error':'invalid_recovery_token'},403)
+        if len(password)<14:return self.json({'error':'password_too_short','minimum':14},400)
+        con=db();owner=rowdict(con.execute("SELECT id FROM users WHERE role='owner' ORDER BY id LIMIT 1").fetchone())
+        if not owner:con.close();return self.json({'error':'owner_not_found'},404)
+        ph,salt=hash_password(password);uid=int(owner['id']);con.execute('UPDATE users SET password_hash=?,salt=? WHERE id=?',(ph,salt,uid));con.execute('DELETE FROM auth_sessions WHERE user_id=?',(uid,));con.execute('DELETE FROM mobile_tokens WHERE user_id=?',(uid,));audit(con,uid,'owner_password_recovered','user',uid,{'sessions_invalidated':True});con.commit();con.close();return self.json({'ok':True,'sessions_invalidated':True})
+    if path=='/api/admin/revoke-sessions':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        scope=clean(b.get('scope'),30);fp=clean(b.get('fingerprint'),32);con=db();revoked=0
+        rows=rowsdict(con.execute('SELECT token FROM auth_sessions WHERE user_id=?',(s['id'],)).fetchall())
+        for r in rows:
+            current=r['token']==s['token'];match=hashlib.sha256(r['token'].encode()).hexdigest()[:16]==fp if fp else False
+            if (scope=='all_other' and not current) or (scope=='fingerprint' and match and not current):
+                con.execute('DELETE FROM auth_sessions WHERE token=?',(r['token'],));revoked+=1
+        audit(con,s['id'],'owner_sessions_revoked','auth_session','',{'scope':scope,'revoked':revoked});con.commit();con.close();return self.json({'ok':True,'revoked':revoked})
+    if path=='/api/admin/bulk-moderate':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        action=clean(b.get('action'),30);targets=b.get('targets') if isinstance(b.get('targets'),list) else [];allowed={'forum_thread':'forum_threads','forum_reply':'forum_replies','blog_post':'blog_posts','blog_comment':'blog_comments'}
+        if action not in ('hide','restore','publish','remove') or not targets or len(targets)>100:return self.json({'error':'invalid_bulk_moderation'},400)
+        status='published' if action in ('restore','publish') else 'hidden';con=db();changed=[]
+        for item in targets:
+            if not isinstance(item,dict):continue
+            tt=clean(item.get('target_type'),30);tid=int(item.get('target_id',0) or 0)
+            if tt not in allowed or not tid:continue
+            cur=con.execute(f'UPDATE {allowed[tt]} SET status=? WHERE id=?',(status,tid));
+            if getattr(cur,'rowcount',0):changed.append({'target_type':tt,'target_id':tid});audit(con,s['id'],'bulk_moderation_'+action,tt,tid)
+        con.commit();con.close();return self.json({'ok':True,'status':status,'changed':changed,'count':len(changed)})
+    if path=='/api/admin/moderator-note':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        tt=clean(b.get('target_type'),30);tid=int(b.get('target_id',0) or 0);note=clean(b.get('note'),4000);allowed=('forum_thread','forum_reply','blog_post','blog_comment','report','user')
+        if tt not in allowed or not tid or len(note)<2:return self.json({'error':'invalid_moderator_note'},400)
+        con=db();nid=insert_id(con,'INSERT INTO moderator_notes(actor_user_id,target_type,target_id,note,created_at) VALUES(?,?,?,?,?)',(s['id'],tt,tid,note,now()));audit(con,s['id'],'moderator_note_added',tt,tid,{'note_id':nid});con.commit();con.close();return self.json({'ok':True,'id':nid},201)
+    if path=='/api/fsa/telemetry':
+        raw=self.rfile.read(int(self.headers.get('Content-Length','0') or 0));self.rfile=io.BytesIO(raw)
+        try:b=json.loads(raw or b'{}')
+        except Exception:b={}
+        supplied=self.headers.get('X-EGM-FSA-Token','');expected=os.environ.get('EGM_FSA_TELEMETRY_TOKEN','')
+        if expected and supplied and hmac.compare_digest(expected,supplied):
+            event_id=clean(b.get('eventId'),200);ext=clean(b.get('sessionId'),160)
+            if event_id:
+                con=db();exists=con.execute('SELECT id FROM normalized_events WHERE source_event_id=?',(event_id,)).fetchone()
+                if exists:
+                    con.execute('INSERT INTO fsa_ingest_diagnostics(external_session_id,event_id,reason,detail,created_at) VALUES(?,?,?,?,?)',(ext,event_id,'duplicate_source_event','Existing normalized event uses this source event ID.',now()));con.commit();con.close();return self.json({'error':'duplicate_or_invalid_fsa_event','detail':'duplicate source event ID'},409)
+                con.close()
+    return _c007_security_post_base(self)
+App.do_POST=_c007_security_do_POST
