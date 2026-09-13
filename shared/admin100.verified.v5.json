@@ -1,0 +1,10 @@
+{
+  "schema":"smartpickshop.egm4000.admin100-verification.v5",
+  "verifiedAt":"2026-09-13",
+  "headCommit":"a63a51573955643fcf697ab93794e4c1ebe01e99",
+  "status":{"total":100,"implemented":71,"modelled":4,"providerConfigurationRequired":25},
+  "newlyVerified":{"A035":"Category management","A036":"Tag management","A037":"Homepage content controls","A038":"Announcement publishing","A039":"Editorial scheduling","A040":"Draft preview"},
+  "verification":{"fullstackSmoke":{"runId":34757699839,"conclusion":"success"},"coreLoopIntegration":{"runId":34757699848,"conclusion":"success"},"portableDockerSmoke":{"runId":34757699832,"conclusion":"success"},"postgresCompatibility":{"runId":34757699844,"conclusion":"success"}},
+  "remainingModelled":["A006","A066","A067","A069"],
+  "providerDependent":"A071-A095"
+}
