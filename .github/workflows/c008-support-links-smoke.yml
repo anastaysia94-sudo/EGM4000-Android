@@ -1,0 +1,91 @@
+name: EGM4000 C008 Optional Support Links
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-support-links-smoke.yml"
+  pull_request:
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-support-links-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  optional-support-links:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fullstack
+    env:
+      EGM_OWNER_PASSWORD: ${{ github.sha }}
+      EGM_PORT: "8045"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install runtime dependency
+        run: pip install -r requirements.txt
+      - name: Contract and syntax checks
+        env:
+          EGM_ASSEMBLE_ONLY: "1"
+        run: |
+          python -m py_compile bootstrap_db.py storage.py monetization_assets.py support_links.py server.py
+          python server.py
+          node --check static/app.js
+          python test_support_links.py
+      - name: HTTP smoke optional support link
+        run: |
+          rm -rf data
+          python bootstrap_db.py --force
+          python server.py > /tmp/egm4000-a092.log 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 25); do
+            if curl -fsS http://127.0.0.1:8045/api/health | grep -q 'egm.event.v1'; then ready=1; break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then cat /tmp/egm4000-a092.log >&2 || true; exit 1; fi
+            sleep 1
+          done
+          test "$ready" -eq 1
+          python - <<'PY' > /tmp/login.json
+          import json,os
+          print(json.dumps({'username':'EGM4000Owner','password':os.environ['EGM_OWNER_PASSWORD']}))
+          PY
+          curl -fsS -c /tmp/owner.cookies -H 'Content-Type: application/json' --data-binary @/tmp/login.json http://127.0.0.1:8045/api/login | grep -q '"ok": true'
+          curl -fsS -b /tmp/owner.cookies http://127.0.0.1:8045/api/me > /tmp/me.json
+          CSRF=$(python -c "import json;print(json.load(open('/tmp/me.json'))['csrf'])")
+          curl -fsS -b /tmp/owner.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"title":"Support EGM4000","body":"Help fund evidence-first educational tools.","destination_url":"https://example.com/support","active":true}' http://127.0.0.1:8045/api/admin/support-link > /tmp/link.json
+          grep -q '"ok": true' /tmp/link.json
+          LINK_ID=$(python -c "import json;print(json.load(open('/tmp/link.json'))['link']['id'])")
+          curl -fsS http://127.0.0.1:8045/api/support-links > /tmp/public.json
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/public.json'))
+          assert x['optional'] is True
+          assert len(x['links'])==1
+          assert 'destinationUrl' not in x['links'][0]
+          assert 'does not prove a donation' in x['boundary']
+          PY
+          curl -sS -o /dev/null -D /tmp/support.headers "http://127.0.0.1:8045/support/$LINK_ID"
+          grep -qi '^Location: https://example.com/support' /tmp/support.headers
+          curl -fsS -b /tmp/owner.cookies http://127.0.0.1:8045/api/admin/support-links > /tmp/admin.json
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/admin.json'))
+          assert x['links'][0]['clicks']==1
+          assert 'does not infer or claim donation amounts' in x['measurementBoundary']
+          PY
+          bad=$(curl -sS -o /tmp/bad.json -w '%{http_code}' -b /tmp/owner.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"title":"Bad support","destination_url":"http://example.com/support","active":true}' http://127.0.0.1:8045/api/admin/support-link)
+          test "$bad" = "400"
+          claim=$(curl -sS -o /tmp/claim.json -w '%{http_code}' -b /tmp/owner.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"title":"Guaranteed profit support","destination_url":"https://example.com/no","active":true}' http://127.0.0.1:8045/api/admin/support-link)
+          test "$claim" = "400"
+          grep -q 'unsafe_guarantee_claim' /tmp/claim.json
+          curl -fsS -b /tmp/owner.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d "{\"action\":\"archive\",\"id\":\"$LINK_ID\"}" http://127.0.0.1:8045/api/admin/support-link | grep -q '"active": false'
+          archived=$(curl -sS -o /tmp/archived.json -w '%{http_code}' "http://127.0.0.1:8045/support/$LINK_ID")
+          test "$archived" = "404"
