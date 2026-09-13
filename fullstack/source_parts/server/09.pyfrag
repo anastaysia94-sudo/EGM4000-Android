@@ -1,0 +1,122 @@
+
+# C007 publishing controls (A035-A040): governed taxonomy, homepage settings,
+# announcements, scheduled publishing, and owner-only draft preview.
+_c=db()
+try:
+    idcol='SERIAL PRIMARY KEY' if getattr(_c,'postgres',False) else 'INTEGER PRIMARY KEY AUTOINCREMENT'
+    for sql in (
+      f'''CREATE TABLE IF NOT EXISTS content_categories(
+        id {idcol},name TEXT UNIQUE NOT NULL,slug TEXT UNIQUE NOT NULL,status TEXT NOT NULL DEFAULT 'active',created_at TEXT NOT NULL,updated_at TEXT NOT NULL
+      )''',
+      f'''CREATE TABLE IF NOT EXISTS content_tags(
+        id {idcol},name TEXT UNIQUE NOT NULL,slug TEXT UNIQUE NOT NULL,status TEXT NOT NULL DEFAULT 'active',created_at TEXT NOT NULL,updated_at TEXT NOT NULL
+      )''',
+      '''CREATE TABLE IF NOT EXISTS homepage_settings(
+        setting_key TEXT PRIMARY KEY,setting_value TEXT NOT NULL,updated_by INTEGER NOT NULL,updated_at TEXT NOT NULL
+      )''',
+      f'''CREATE TABLE IF NOT EXISTS announcements(
+        id {idcol},title TEXT NOT NULL,body TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'draft',starts_at TEXT,ends_at TEXT,created_by INTEGER NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL
+      )''',
+      f'''CREATE TABLE IF NOT EXISTS editorial_schedule(
+        id {idcol},post_id INTEGER UNIQUE NOT NULL,publish_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'scheduled',created_by INTEGER NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL
+      )'''
+    ):
+        _c.execute(sql)
+    _c.commit()
+finally:_c.close()
+
+def _slugify(v):
+    return re.sub(r'-+','-',re.sub(r'[^a-z0-9]+','-',clean(v,80).lower())).strip('-')[:80]
+
+def _publish_due(con):
+    due=rowsdict(con.execute("SELECT id,post_id FROM editorial_schedule WHERE status='scheduled' AND publish_at<=? ORDER BY publish_at,id",(now(),)).fetchall())
+    for item in due:
+        con.execute("UPDATE blog_posts SET status='published',updated_at=? WHERE id=?",(now(),item['post_id']))
+        con.execute("UPDATE editorial_schedule SET status='published',updated_at=? WHERE id=?",(now(),item['id']))
+        audit(con,None,'scheduled_blog_published','blog_post',item['post_id'],{'schedule_id':item['id']})
+    if due:con.commit()
+    return len(due)
+
+_publish_get_base=App.do_GET
+def _publishing_do_GET(self):
+    p=urlparse(self.path);path=p.path;q=parse_qs(p.query)
+    if path in ('/api/blog/posts','/api/blog/post'):
+        con=db();_publish_due(con);con.close();return _publish_get_base(self)
+    if path=='/api/content/navigation':
+        con=db();cats=rowsdict(con.execute("SELECT id,name,slug FROM content_categories WHERE status='active' ORDER BY name").fetchall());tags=rowsdict(con.execute("SELECT id,name,slug FROM content_tags WHERE status='active' ORDER BY name").fetchall());settings=rowsdict(con.execute('SELECT setting_key,setting_value FROM homepage_settings ORDER BY setting_key').fetchall());anns=rowsdict(con.execute("SELECT id,title,body,starts_at,ends_at FROM announcements WHERE status='published' AND (starts_at IS NULL OR starts_at<=?) AND (ends_at IS NULL OR ends_at>=?) ORDER BY id DESC LIMIT 10",(now(),now())).fetchall());con.close();return self.json({'schema':'egm.content-navigation.v1','categories':cats,'tags':tags,'homepage':{x['setting_key']:x['setting_value'] for x in settings},'announcements':anns})
+    if path=='/api/admin/taxonomy':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();cats=rowsdict(con.execute('SELECT * FROM content_categories ORDER BY name').fetchall());tags=rowsdict(con.execute('SELECT * FROM content_tags ORDER BY name').fetchall());con.close();return self.json({'schema':'egm.admin.taxonomy.v1','categories':cats,'tags':tags})
+    if path=='/api/admin/homepage':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();rows=rowsdict(con.execute('SELECT * FROM homepage_settings ORDER BY setting_key').fetchall());con.close();return self.json({'schema':'egm.admin.homepage.v1','settings':rows})
+    if path=='/api/admin/announcements':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();rows=rowsdict(con.execute('SELECT * FROM announcements ORDER BY id DESC LIMIT 100').fetchall());con.close();return self.json({'schema':'egm.admin.announcements.v1','announcements':rows})
+    if path=='/api/admin/editorial-schedule':
+        s=self.need(owner=True)
+        if not s:return
+        con=db();published=_publish_due(con);rows=rowsdict(con.execute('SELECT e.*,b.title,b.status post_status FROM editorial_schedule e JOIN blog_posts b ON b.id=e.post_id ORDER BY e.publish_at DESC,e.id DESC LIMIT 100').fetchall());con.close();return self.json({'schema':'egm.admin.editorial-schedule.v1','published_due':published,'schedule':rows})
+    if path=='/api/admin/draft-preview':
+        s=self.need(owner=True)
+        if not s:return
+        pid=int(qval(q,'post_id','0') or 0);con=db();post=rowdict(con.execute('SELECT b.*,u.display_name FROM blog_posts b JOIN users u ON u.id=b.user_id WHERE b.id=?',(pid,)).fetchone());schedule=rowdict(con.execute('SELECT * FROM editorial_schedule WHERE post_id=?',(pid,)).fetchone());con.close()
+        if not post:return self.json({'error':'post_not_found'},404)
+        return self.json({'schema':'egm.admin.draft-preview.v1','post':post,'schedule':schedule,'previewOnly':post.get('status')!='published'})
+    return _publish_get_base(self)
+App.do_GET=_publishing_do_GET
+
+_publish_post_base=App.do_POST
+def _publishing_do_POST(self):
+    path=urlparse(self.path).path
+    if path=='/api/admin/taxonomy':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        kind=clean(b.get('kind'),20);name=clean(b.get('name'),80);slug=_slugify(b.get('slug') or name);status=clean(b.get('status') or 'active',20)
+        table='content_categories' if kind=='category' else ('content_tags' if kind=='tag' else '')
+        if not table or len(name)<2 or not slug or status not in ('active','archived'):return self.json({'error':'invalid_taxonomy'},400)
+        con=db();existing=rowdict(con.execute(f'SELECT id FROM {table} WHERE slug=?',(slug,)).fetchone())
+        try:
+            if existing:
+                con.execute(f'UPDATE {table} SET name=?,status=?,updated_at=? WHERE id=?',(name,status,now(),existing['id']));tid=existing['id']
+            else:tid=insert_id(con,f'INSERT INTO {table}(name,slug,status,created_at,updated_at) VALUES(?,?,?,?,?)',(name,slug,status,now(),now()))
+            audit(con,s['id'],'taxonomy_upserted',kind,tid,{'name':name,'slug':slug,'status':status});con.commit();con.close();return self.json({'ok':True,'id':tid,'slug':slug,'status':status})
+        except Exception as e:
+            con.rollback();con.close();return self.json({'error':'taxonomy_conflict','detail':clean(str(e),160)},409)
+    if path=='/api/admin/homepage':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        settings=b.get('settings') if isinstance(b.get('settings'),dict) else {};allowed={'hero_title','hero_body','featured_post_id','community_callout','research_callout'}
+        clean_settings={clean(k,60):clean(v,500) for k,v in settings.items() if k in allowed}
+        if not clean_settings:return self.json({'error':'no_valid_settings'},400)
+        con=db()
+        for k,v in clean_settings.items():
+            if con.execute('SELECT setting_key FROM homepage_settings WHERE setting_key=?',(k,)).fetchone():con.execute('UPDATE homepage_settings SET setting_value=?,updated_by=?,updated_at=? WHERE setting_key=?',(v,s['id'],now(),k))
+            else:con.execute('INSERT INTO homepage_settings(setting_key,setting_value,updated_by,updated_at) VALUES(?,?,?,?)',(k,v,s['id'],now()))
+        audit(con,s['id'],'homepage_settings_updated','homepage','',{'keys':sorted(clean_settings)});con.commit();con.close();return self.json({'ok':True,'settings':clean_settings})
+    if path=='/api/admin/announcement':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        aid=int(b.get('id',0) or 0);title=clean(b.get('title'),140);body=clean(b.get('body'),4000);status=clean(b.get('status') or 'draft',20);starts=clean(b.get('starts_at'),80) or None;ends=clean(b.get('ends_at'),80) or None
+        if len(title)<3 or len(body)<3 or status not in ('draft','published','archived'):return self.json({'error':'invalid_announcement'},400)
+        con=db()
+        if aid and con.execute('SELECT id FROM announcements WHERE id=?',(aid,)).fetchone():con.execute('UPDATE announcements SET title=?,body=?,status=?,starts_at=?,ends_at=?,updated_at=? WHERE id=?',(title,body,status,starts,ends,now(),aid))
+        else:aid=insert_id(con,'INSERT INTO announcements(title,body,status,starts_at,ends_at,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',(title,body,status,starts,ends,s['id'],now(),now()))
+        audit(con,s['id'],'announcement_saved','announcement',aid,{'status':status});con.commit();con.close();return self.json({'ok':True,'id':aid,'status':status})
+    if path=='/api/admin/schedule-post':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        pid=int(b.get('post_id',0) or 0);publish_at=clean(b.get('publish_at'),80);con=db();post=rowdict(con.execute('SELECT id,status FROM blog_posts WHERE id=?',(pid,)).fetchone())
+        if not post or not publish_at:con.close();return self.json({'error':'invalid_schedule'},400)
+        try:datetime.fromisoformat(publish_at.replace('Z','+00:00'))
+        except Exception:con.close();return self.json({'error':'invalid_publish_at'},400)
+        existing=rowdict(con.execute('SELECT id FROM editorial_schedule WHERE post_id=?',(pid,)).fetchone())
+        if existing:
+            sid=existing['id'];con.execute("UPDATE editorial_schedule SET publish_at=?,status='scheduled',created_by=?,updated_at=? WHERE id=?",(publish_at,s['id'],now(),sid))
+        else:sid=insert_id(con,'INSERT INTO editorial_schedule(post_id,publish_at,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?)',(pid,publish_at,'scheduled',s['id'],now(),now()))
+        con.execute("UPDATE blog_posts SET status='draft',updated_at=? WHERE id=?",(now(),pid));audit(con,s['id'],'blog_post_scheduled','blog_post',pid,{'schedule_id':sid,'publish_at':publish_at});con.commit();con.close();return self.json({'ok':True,'schedule_id':sid,'post_id':pid,'publish_at':publish_at,'status':'scheduled'})
+    return _publish_post_base(self)
+App.do_POST=_publishing_do_POST
