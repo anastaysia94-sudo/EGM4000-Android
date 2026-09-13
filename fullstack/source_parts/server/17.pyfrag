@@ -1,0 +1,57 @@
+
+# C008 A092: optional support/tip-jar links with aggregate click measurement only.
+from support_links import admin_support_links,archive_support_link,migrate_support_links,public_support_links,resolve_support_click,save_support_link
+
+_c008s=db()
+try:migrate_support_links(_c008s)
+finally:_c008s.close()
+
+_C008_SUPPORT_FIELDS={'id','title','body','destination_url','disclosure','active','action'}
+
+def _c008_support_error(self,exc):
+    code=str(exc);status=404 if code=='support_link_not_found' else 400
+    return self.json({'error':code},status)
+
+_c008s_get_base=App.do_GET
+def _c008s_do_GET(self):
+    path=urlparse(self.path).path
+    if path=='/api/support-links':
+        con=db()
+        try:payload=public_support_links(con)
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/admin/support-links':
+        s=self.need(owner=True)
+        if not s:return
+        con=db()
+        try:payload=admin_support_links(con)
+        finally:con.close()
+        return self.json(payload)
+    if path.startswith('/support/'):
+        link_id=path[len('/support/'):].strip('/')[:80]
+        con=db()
+        try:link=resolve_support_click(con,link_id)
+        finally:con.close()
+        if not link:return self.json({'error':'support_link_not_found'},404)
+        self.send_response(302);self.send_header('Location',link['destinationUrl']);self.send_header('Cache-Control','no-store');self.send_common();self.end_headers();return
+    return _c008s_get_base(self)
+App.do_GET=_c008s_do_GET
+
+_c008s_post_base=App.do_POST
+def _c008s_do_POST(self):
+    path=urlparse(self.path).path
+    if path=='/api/admin/support-link':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        unknown=set(b)-_C008_SUPPORT_FIELDS
+        if unknown:return self.json({'error':'unsupported_support_link_fields','fields':sorted(str(x) for x in unknown)},400)
+        con=db()
+        try:
+            if clean(b.get('action'),20)=='archive':link=archive_support_link(con,b.get('id'));action='support_link_archived'
+            else:link=save_support_link(con,b);action='support_link_saved'
+            audit(con,s['id'],action,'support_link',link['id'],{'active':link['active']});con.commit()
+        except ValueError as exc:
+            con.rollback();con.close();return _c008_support_error(self,exc)
+        con.close();return self.json({'ok':True,'link':link})
+    return _c008s_post_base(self)
+App.do_POST=_c008s_do_POST
