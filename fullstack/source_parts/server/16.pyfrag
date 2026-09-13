@@ -1,0 +1,89 @@
+
+# C008 A087: custom report package request and fulfillment workflow.
+from custom_reports import admin_packages,admin_requests,create_request,migrate_custom_reports,my_requests,public_packages,save_package,update_request
+
+_c008r=db()
+try:migrate_custom_reports(_c008r)
+finally:_c008r.close()
+
+_C008_REPORT_PACKAGE_FIELDS={'id','title','description','deliverables','price_label','turnaround_label','status'}
+_C008_REPORT_REQUEST_FIELDS={'id','status','payment_status','owner_note','delivery_note','delivery_url','provider_verification'}
+
+def _c008_report_error(self,exc):
+    code=str(exc)
+    status=404 if code in ('report_request_not_found','report_package_not_available') else (409 if code=='active_report_request_exists' else 400)
+    return self.json({'error':code},status)
+
+_c008r_get_base=App.do_GET
+def _c008r_do_GET(self):
+    path=urlparse(self.path).path
+    if path=='/api/custom-report-packages':
+        con=db()
+        try:payload=public_packages(con)
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/my-custom-report-requests':
+        s=self.need()
+        if not s:return
+        con=db()
+        try:payload=my_requests(con,s['id'])
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/admin/custom-report-packages':
+        s=self.need(owner=True)
+        if not s:return
+        con=db()
+        try:payload={'schema':'egm.admin.custom-report-packages.v1','packages':admin_packages(con)}
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/admin/custom-report-requests':
+        s=self.need(owner=True)
+        if not s:return
+        con=db()
+        try:payload=admin_requests(con)
+        finally:con.close()
+        return self.json(payload)
+    return _c008r_get_base(self)
+App.do_GET=_c008r_do_GET
+
+_c008r_post_base=App.do_POST
+def _c008r_do_POST(self):
+    path=urlparse(self.path).path
+    if path=='/api/custom-report-request':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        con=db()
+        try:
+            request=create_request(con,s['id'],b)
+            audit(con,s['id'],'custom_report_requested','custom_report_request',request['id'],{'package_id':request['packageId']});con.commit()
+        except ValueError as exc:
+            con.rollback();con.close();return _c008_report_error(self,exc)
+        con.close();return self.json({'ok':True,'request':request},201)
+    if path=='/api/admin/custom-report-package':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        unknown=set(b)-_C008_REPORT_PACKAGE_FIELDS
+        if unknown:return self.json({'error':'unsupported_report_package_fields','fields':sorted(str(x) for x in unknown)},400)
+        con=db()
+        try:
+            package=save_package(con,b)
+            audit(con,s['id'],'custom_report_package_saved','custom_report_package',package['id'],{'status':package['status']});con.commit()
+        except ValueError as exc:
+            con.rollback();con.close();return _c008_report_error(self,exc)
+        con.close();return self.json({'ok':True,'package':package})
+    if path=='/api/admin/custom-report-request':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        unknown=set(b)-_C008_REPORT_REQUEST_FIELDS
+        if unknown:return self.json({'error':'unsupported_report_request_fields','fields':sorted(str(x) for x in unknown)},400)
+        if clean(b.get('payment_status'),40)=='provider_verified':
+            return self.json({'error':'billing_provider_confirmation_not_available'},409)
+        con=db()
+        try:
+            request=update_request(con,b.get('id'),b)
+            audit(con,s['id'],'custom_report_request_updated','custom_report_request',request['id'],{'status':request['status'],'payment_status':request['paymentStatus']});con.commit()
+        except ValueError as exc:
+            con.rollback();con.close();return _c008_report_error(self,exc)
+        con.close();return self.json({'ok':True,'request':request})
+    return _c008r_post_base(self)
+App.do_POST=_c008r_do_POST
