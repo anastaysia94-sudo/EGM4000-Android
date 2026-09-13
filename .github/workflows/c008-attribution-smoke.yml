@@ -1,0 +1,110 @@
+name: EGM4000 C008 Affiliate Attribution
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-attribution-smoke.yml"
+  pull_request:
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-attribution-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  affiliate-attribution:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fullstack
+    env:
+      EGM_OWNER_PASSWORD: ${{ github.sha }}
+      EGM_PORT: "8043"
+      TEST_USER_PASSWORD: "C008-Test-Account-Strong-2026"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install runtime dependency
+        run: pip install -r requirements.txt
+
+      - name: Assemble and run commercial-access contracts
+        env:
+          EGM_ASSEMBLE_ONLY: "1"
+        run: |
+          python -m py_compile bootstrap_db.py storage.py commercial_access.py server.py
+          python server.py
+          node --check static/app.js
+          python test_commercial_access.py
+
+      - name: HTTP smoke referral click to registered attribution
+        run: |
+          rm -rf data
+          python bootstrap_db.py --force
+          python server.py > /tmp/egm4000-c008-affiliate.log 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 25); do
+            if curl -fsS http://127.0.0.1:8043/api/health | grep -q 'egm.event.v1'; then ready=1; break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then cat /tmp/egm4000-c008-affiliate.log >&2 || true; exit 1; fi
+            sleep 1
+          done
+          test "$ready" -eq 1
+
+          python - <<'PY' > /tmp/owner-login.json
+          import json,os
+          print(json.dumps({"username":"EGM4000Owner","password":os.environ["EGM_OWNER_PASSWORD"]}))
+          PY
+          curl -fsS -c /tmp/owner.cookies -H 'Content-Type: application/json' --data-binary @/tmp/owner-login.json http://127.0.0.1:8043/api/login | grep -q '"ok": true'
+          curl -fsS -b /tmp/owner.cookies http://127.0.0.1:8043/api/me > /tmp/owner-me.json
+          OWNER_CSRF=$(python -c "import json;print(json.load(open('/tmp/owner-me.json'))['csrf'])")
+
+          curl -fsS -b /tmp/owner.cookies -H "X-CSRF-Token: $OWNER_CSRF" -H 'Content-Type: application/json' -d '{"label":"CI Evidence Creator","code":"CREATOR-7","landing_path":"/","active":true}' http://127.0.0.1:8043/api/admin/affiliate > /tmp/affiliate-created.json
+          grep -q '"ok": true' /tmp/affiliate-created.json
+          AFFILIATE_ID=$(python -c "import json;print(json.load(open('/tmp/affiliate-created.json'))['partner']['id'])")
+
+          curl -sS -o /dev/null -D /tmp/ref.headers http://127.0.0.1:8043/ref/CREATOR-7
+          grep -q '^HTTP/1.0 302' /tmp/ref.headers
+          grep -qi '^Location: /?ref=CREATOR-7' /tmp/ref.headers
+
+          python - <<'PY' > /tmp/register.json
+          import json,os
+          print(json.dumps({"display_name":"Affiliate Test","username":"affiliate_test","email":"affiliate-test@example.test","password":os.environ["TEST_USER_PASSWORD"],"favorite_platform":"Fire Kirin","skill_focus":"Evidence review"}))
+          PY
+          curl -fsS -H 'Content-Type: application/json' --data-binary @/tmp/register.json http://127.0.0.1:8043/api/register | grep -q '"ok": true'
+          python - <<'PY' > /tmp/user-login.json
+          import json,os
+          print(json.dumps({"username":"affiliate_test","password":os.environ["TEST_USER_PASSWORD"]}))
+          PY
+          curl -fsS -c /tmp/user.cookies -H 'Content-Type: application/json' --data-binary @/tmp/user-login.json http://127.0.0.1:8043/api/login | grep -q '"ok": true'
+          curl -fsS -b /tmp/user.cookies http://127.0.0.1:8043/api/me > /tmp/user-me.json
+          USER_CSRF=$(python -c "import json;print(json.load(open('/tmp/user-me.json'))['csrf'])")
+          curl -fsS -b /tmp/user.cookies -H "X-CSRF-Token: $USER_CSRF" -H 'Content-Type: application/json' -d '{"code":"CREATOR-7"}' http://127.0.0.1:8043/api/affiliate/claim | grep -q '"attributed": true'
+          curl -fsS -b /tmp/user.cookies -H "X-CSRF-Token: $USER_CSRF" -H 'Content-Type: application/json' -d '{"code":"CREATOR-7"}' http://127.0.0.1:8043/api/affiliate/claim | grep -q '"attributed": false'
+
+          curl -fsS -b /tmp/owner.cookies http://127.0.0.1:8043/api/admin/affiliates > /tmp/affiliate-ledger.json
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/affiliate-ledger.json'))
+          p=x['partners'][0]
+          assert p['code']=='CREATOR-7'
+          assert p['clicks']==1
+          assert p['signups']==1
+          assert p['conversionRate']==1.0
+          assert 'raw IP' in x['privacy']
+          PY
+
+          bad=$(curl -sS -o /tmp/bad-affiliate.json -w '%{http_code}' -b /tmp/owner.cookies -H "X-CSRF-Token: $OWNER_CSRF" -H 'Content-Type: application/json' -d '{"label":"Bad Landing","code":"BAD-LANDING","landing_path":"/api/private","active":true}' http://127.0.0.1:8043/api/admin/affiliate)
+          test "$bad" = "400"
+          grep -q 'reserved_landing_path' /tmp/bad-affiliate.json
+
+          curl -fsS -b /tmp/owner.cookies -H "X-CSRF-Token: $OWNER_CSRF" -H 'Content-Type: application/json' -d "{\"action\":\"archive\",\"id\":\"$AFFILIATE_ID\"}" http://127.0.0.1:8043/api/admin/affiliate | grep -q '"active": false'
+          archived=$(curl -sS -o /tmp/archived-ref.json -w '%{http_code}' http://127.0.0.1:8043/ref/CREATOR-7)
+          test "$archived" = "404"
