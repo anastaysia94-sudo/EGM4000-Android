@@ -78,8 +78,8 @@ def _c007_security_do_POST(self):
             if not isinstance(item,dict):continue
             tt=clean(item.get('target_type'),30);tid=int(item.get('target_id',0) or 0)
             if tt not in allowed or not tid:continue
-            cur=con.execute(f'UPDATE {allowed[tt]} SET status=? WHERE id=?',(status,tid));
-            if getattr(cur,'rowcount',0):changed.append({'target_type':tt,'target_id':tid});audit(con,s['id'],'bulk_moderation_'+action,tt,tid)
+            if not con.execute(f'SELECT id FROM {allowed[tt]} WHERE id=?',(tid,)).fetchone():continue
+            con.execute(f'UPDATE {allowed[tt]} SET status=? WHERE id=?',(status,tid));changed.append({'target_type':tt,'target_id':tid});audit(con,s['id'],'bulk_moderation_'+action,tt,tid)
         con.commit();con.close();return self.json({'ok':True,'status':status,'changed':changed,'count':len(changed)})
     if path=='/api/admin/moderator-note':
         b=self.body();s=self.need(owner=True,csrf=True)
