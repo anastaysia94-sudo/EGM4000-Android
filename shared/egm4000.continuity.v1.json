@@ -1,6 +1,6 @@
 {
   "schema": "smartpickshop.egm4000.continuity.v1",
-  "updatedAt": "2026-09-13T18:24:00Z",
+  "updatedAt": "2026-09-13T21:40:00Z",
   "repository": "anastaysia94-sudo/EGM4000-Android",
   "project": {
     "name": "EGM4000 / EduGameMaster 4000",
@@ -19,7 +19,7 @@
   },
   "products": {
     "egm4000": {
-      "status": "Android v0.2 debug beta + persistent full-stack Web/PWA with integrated C006 Tips Center, C014 coaching experiment comparison, completed C009 Return User Lab, audited C007 Admin 100 registry, and first verified C008 monetization slice",
+      "status": "Android v0.2 debug beta + persistent full-stack Web/PWA with integrated C006 Tips Center, C014 coaching experiment comparison, completed C009 Return User Lab, audited C007 Admin 100 registry, and eight verified C008 monetization capabilities",
       "role": "Gameplay intelligence, authorized evidence logging, normalized metrics/replay, confidence-calibrated coaching, persistent follow-up comparison, community, privacy-safe surveys, owner administration, safe research, and clearly separated optional commercial resources.",
       "paths": ["android-egm4000/", "web/", "fullstack/", "shared/", "docs/"]
     },
@@ -41,7 +41,7 @@
       "C004": "Community forum/blog with persistent backend, registered-user posting, reports, owner moderation and audit events.",
       "C005": "Privacy-preserving visitor surveys with consent, first/returning/registered targeting, pseudonymous visitor identifiers, persistent responses and owner builder.",
       "C006": "Session-derived Tips Center integrated with the shared full-stack core loop. Live/Android-synced evidence produces persistent coaching with provenance/evidence type, confidence, sample size, metrics and uncertainty.",
-      "C007": "Admin 100 is fully audited with 100 canonical capabilities. The verified current split is 80 implemented end-to-end, 0 modelled, and 20 explicitly isolated as provider-configuration-required monetization capabilities owned by C008.",
+      "C007": "Admin 100 remains canonically audited at 80 implemented, 0 modelled and 20 provider-configuration-required. Three additional C008 capabilities are now operationally verified but await registry promotion after the legacy count assertion is safely refactored without weakening security-fixture coverage.",
       "C009": "All 49 canonical return-user features are implemented and testable. My Evidence Lab completes tip ratings, historical personal-best and efficiency views, fatigue/pause safeguards, safe evidence-use goals and achievements, coach inbox, screenshot/video/voice evidence intake, smart tags, saved views, and notification controls. Synthetic users remain excluded from real-user adoption counts.",
       "C010": "Shared F.S.A. exact-telemetry fixture and validator added; integration CI validates the fixture and normalized contract.",
       "C011": "Android Evidence Review v0.2 account-aware sync client is implemented; its legacy event aliases are normalized by the server into the shared core-loop vocabulary.",
@@ -50,7 +50,7 @@
     },
     "incomplete": {
       "C003": "Production owner/auth boundary exists in the full-stack foundation but still requires deployment hardening, recovery controls, production secret/provider configuration and final security validation.",
-      "C008": "5 of 25 monetization capabilities are verified implemented: A079 partner referral tracking, A081 sponsored educational placements, A090 hardware/capture partner referrals, A091 training/course upsells, and A093 promotional bundle controls. The remaining 20 require real provider-backed behavior or provider configuration before promotion."
+      "C008": "8 of 25 monetization capabilities are operationally verified: A079 partner referral tracking, A080 affiliate attribution, A081 sponsored educational placements, A087 custom report packages, A090 hardware/capture partner referrals, A091 training/course upsells, A092 optional support links, and A093 promotional bundle controls. Seventeen capabilities remain not operational end-to-end. A080/A087/A092 await canonical Admin 100 registry promotion only because the legacy fullstack smoke embeds the old exact count inside credential-heavy security-fixture YAML that was not safely rewritten through the connector."
     }
   },
   "admin100": {
@@ -62,24 +62,52 @@
     "implemented": 80,
     "modelled": 0,
     "providerConfigurationRequired": 20,
-    "rule": "A capability is not marked implemented unless a current route, persisted datastore, UI, safety control, and relevant verification concretely back the claim. Remaining provider-dependent C008 capabilities stay visibly provider-configuration-required until real end-to-end provider-backed behavior exists."
+    "verifiedButRegistryPromotionPending": ["A080", "A087", "A092"],
+    "expectedAfterSafeRegistryPromotion": {
+      "implemented": 83,
+      "modelled": 0,
+      "providerConfigurationRequired": 17
+    },
+    "rule": "Canonical registry counts must not be changed until the general Admin 100 integrity smoke can accept the new count without weakening or deleting existing security regression coverage. Operational verification is tracked separately so completed work is not lost or falsely reclassified."
   },
   "monetization25": {
     "milestone": "C008",
     "total": 25,
-    "implemented": 5,
-    "providerConfigurationRequired": 20,
-    "implementedCapabilities": ["A079", "A081", "A090", "A091", "A093"],
+    "verifiedOperational": 8,
+    "remainingNotOperational": 17,
+    "canonicalRegistryImplemented": 5,
+    "canonicalRegistryProviderConfigurationRequired": 20,
+    "registryPromotionPending": ["A080", "A087", "A092"],
+    "implementedCapabilities": ["A079", "A080", "A081", "A087", "A090", "A091", "A092", "A093"],
+    "backendReadyButNotOperational": ["A084"],
     "assetEngine": "fullstack/monetization_assets.py",
-    "ownerEndpoint": "GET /api/admin/monetization-assets",
-    "ownerWriteEndpoint": "POST /api/admin/monetization-asset",
+    "assetOwnerEndpoint": "GET /api/admin/monetization-assets",
+    "assetWriteEndpoint": "POST /api/admin/monetization-asset",
     "publicCatalogEndpoint": "GET /api/monetization/catalog",
     "measuredOutboundPath": "GET /go/<slug>",
-    "ownerUi": "Owner Command Center -> C008 Provider-independent launch slice",
-    "publicUi": "Today -> Optional resources & offers",
-    "privacy": "Outbound click measurement is aggregate. The C008 asset ledger does not store raw IP addresses, browser fingerprints, or cross-site visitor identifiers.",
-    "safety": "Commercial resources stay visibly separate from gameplay evidence. HTTPS-only destinations, secret-field rejection, sponsored disclosure, and unsafe guaranteed-profit/winnings claim rejection are enforced server-side.",
-    "verifiedCodeCommit": "6041bfa3989af83e7670d2d0adbfd6214f676386"
+    "affiliateEngine": "fullstack/commercial_access.py",
+    "affiliateOwnerEndpoint": "GET /api/admin/affiliates",
+    "affiliateWriteEndpoint": "POST /api/admin/affiliate",
+    "affiliateClaimEndpoint": "POST /api/affiliate/claim",
+    "affiliateReferralPath": "GET /ref/<code>",
+    "customReportEngine": "fullstack/custom_reports.py",
+    "customReportPublicEndpoint": "GET /api/custom-report-packages",
+    "customReportRequestEndpoint": "POST /api/custom-report-request",
+    "customReportHistoryEndpoint": "GET /api/my-custom-report-requests",
+    "customReportOwnerPackagesEndpoint": "GET /api/admin/custom-report-packages",
+    "customReportOwnerRequestsEndpoint": "GET /api/admin/custom-report-requests",
+    "supportLinkEngine": "fullstack/support_links.py",
+    "supportLinkPublicEndpoint": "GET /api/support-links",
+    "supportLinkOwnerEndpoint": "GET /api/admin/support-links",
+    "supportLinkRedirectPath": "GET /support/<id>",
+    "privacy": "Commercial click measurement is aggregate. Affiliate click events and optional support links do not store raw IP addresses, browser fingerprints, or cross-site visitor identifiers. Affiliate signup attribution links only an internal registered user to the preceding referral partner.",
+    "safety": "Commercial resources stay visibly separate from gameplay evidence. HTTPS-only external destinations, unsafe guarantee-claim rejection, explicit sponsored/voluntary-support disclosure, and honest external-unverified payment state are enforced. A click is never treated as a completed donation or purchase.",
+    "verifiedCommits": {
+      "firstFivePromotion": "6041bfa3989af83e7670d2d0adbfd6214f676386",
+      "affiliateAttribution": "c4e683e7d3547b720c1128b78700d3f731be0fcf",
+      "customReportPackages": "625f181f9a637c552c8b6ba428e195ba6648cd18",
+      "optionalSupportLinks": "5b967ba5889687dfb87d8604cf21dcec37b08b3c"
+    }
   },
   "returnUser49": {
     "registry": "fullstack/return_registry.py",
@@ -132,22 +160,44 @@
   },
   "verification": {
     "workflow": ".github/workflows/integration-core-loop.yml",
-    "lastVerifiedRunId": 34774347238,
     "lastVerifiedConclusion": "success",
     "admin100Workflow": ".github/workflows/fullstack-smoke.yml",
-    "admin100VerifiedRunId": 34774347231,
-    "admin100VerifiedConclusion": "success",
-    "c008Workflow": ".github/workflows/c008-assets-smoke.yml",
-    "c008VerifiedRunId": 34774347245,
-    "c008VerifiedConclusion": "success",
-    "returnUserWorkflow": ".github/workflows/return-features-smoke.yml",
-    "returnUserVerifiedRunId": 34774347240,
-    "returnUserVerifiedConclusion": "success",
-    "postgresVerifiedRunId": 34774347242,
-    "postgresVerifiedConclusion": "success",
-    "dockerVerifiedRunId": 34774347260,
-    "dockerVerifiedConclusion": "success",
-    "verifiedChecks": ["F.S.A. exact-telemetry fixture validation", "full-stack core-loop integration", "persistent C006 tip generation", "C014 baseline target upgrade", "C014 same-platform follow-up linking", "C014 Improved behavior classification", "random-credit outcome exclusion from experiment scoring", "Admin 100 exactly 100 named capabilities", "Admin 100 contains no generic placeholder titles", "Admin 100 audited 80 implemented / 0 modelled / 20 provider-configuration-required split", "Admin 100 spans nine explicit categories", "A001-A070, A079, A081, A090, A091, A093 and A096-A100 are implemented", "A079 partner referral tracking uses owner-managed HTTPS assets and aggregate measured redirects", "A081 sponsored education is visibly disclosed and optional", "A090 hardware/capture referrals use the safe measured asset ledger", "A091 training/course upsells remain separate from gameplay evidence", "A093 promotional bundles have owner controls, safe-copy validation, archive state and click evidence", "C008 rejects insecure HTTP/private literal destinations, secret write fields, and guaranteed-profit/winnings claims", "C008 public catalog hides raw outbound destinations behind measured /go/<slug> handoffs", "C009 R001-R049 exactly 49 canonical implemented features", "C009 Return User Lab authenticated workspace", "C009 CSRF-protected tip ratings, safe goals, pause, preferences, notes and saved views", "C009 screenshot/video/voice evidence upload validation and authenticated retrieval", "C009 smart-tag and media-review persistence", "PostgreSQL/Supabase compatibility", "portable production-style Docker smoke", "public app assembly", "fresh database bootstrap", "public API smoke", "Python syntax check", "JavaScript syntax check"]
+    "admin100CanonicalRegistryConclusion": "success_at_80_0_20_before_pending_promotions",
+    "c008AssetsWorkflow": ".github/workflows/c008-assets-smoke.yml",
+    "c008AssetsVerifiedRunId": 34774347245,
+    "c008AssetsVerifiedConclusion": "success",
+    "c008AffiliateWorkflow": ".github/workflows/c008-attribution-smoke.yml",
+    "c008AffiliateVerifiedRunId": 34784084243,
+    "c008AffiliateVerifiedConclusion": "success",
+    "c008CustomReportsWorkflow": ".github/workflows/c008-custom-reports-smoke.yml",
+    "c008CustomReportsVerifiedRunId": 34784345341,
+    "c008CustomReportsVerifiedConclusion": "success",
+    "c008SupportLinksWorkflow": ".github/workflows/c008-support-links-smoke.yml",
+    "c008SupportLinksVerifiedRunId": 34784440557,
+    "c008SupportLinksVerifiedConclusion": "success",
+    "verifiedChecks": [
+      "A079 partner referral tracking uses owner-managed HTTPS assets and aggregate measured redirects",
+      "A080 affiliate attribution has owner-managed referral codes, measured /ref/<code> redirects, one-time authenticated-user attribution, click/signup conversion reporting, archive cutoff and no raw IP/browser fingerprint storage",
+      "A081 sponsored education is visibly disclosed and optional",
+      "A087 custom report packages have owner package controls, authenticated customer request/history, duplicate-open-request prevention, fulfillment status, HTTPS delivery validation, delivery-content requirements, and explicit external-unverified payment state",
+      "A087 rejects attempts to self-certify provider-verified payment without a real billing integration",
+      "A090 hardware/capture referrals use the safe measured asset ledger",
+      "A091 training/course upsells remain separate from gameplay evidence",
+      "A092 voluntary support links have HTTPS-only destinations, safe-claim validation, explicit optional-support disclosure, aggregate click counts and no inferred donation/payment amount",
+      "A093 promotional bundles have owner controls, safe-copy validation, archive state and click evidence",
+      "A084 API access-plan persistence/scoping/quota/hash/rotation engine passes module contracts but remains unexposed and therefore unpromoted",
+      "C009 R001-R049 exactly 49 canonical implemented features",
+      "PostgreSQL/Supabase compatibility",
+      "portable production-style Docker smoke",
+      "public app assembly",
+      "fresh database bootstrap",
+      "Python syntax checks",
+      "JavaScript syntax checks"
+    ]
+  },
+  "knownMaintenance": {
+    "admin100PromotionGate": "The legacy .github/workflows/fullstack-smoke.yml contains a hard-coded 80/0/20 registry assertion inside credential-heavy recovery/MFA security fixtures. Connector safety refused a full-file rewrite that would reproduce those credential fixtures. Do not bypass the safety gate, delete the security coverage, or fake the registry count. Refactor the count assertion safely using repository-native editing/Work/Codex or another permitted method, then promote A080/A087/A092 atomically and verify the full regression matrix.",
+    "a084Status": "commercial_access.py contains a tested A084 API access-plan backend engine with hashed generated keys, scopes, quota accounting and key rotation. Attempts to expose credential-bearing developer API routes through the connector were safety-blocked. Leave A084 unpromoted until a permitted route implementation is added and HTTP-tested."
   },
   "safetyBoundaries": {
     "noCredentialStorage": true,
@@ -160,7 +210,8 @@
     "researchLabAuthorizedSandboxOnly": true
   },
   "nextMilestones": [
-    {"id": "C008", "title": "Complete remaining 20 monetization capabilities", "definitionOfDone": "The remaining provider-dependent A071-A095 capabilities each have safe, non-deceptive end-to-end behavior, explicit real provider configuration where required, measurement, owner controls and tests. Current verified baseline: 5 implemented / 20 provider-configuration-required."},
+    {"id": "C008-registry", "title": "Safely promote A080/A087/A092 in Admin 100", "definitionOfDone": "Refactor the general Admin 100 CI count assertion without weakening existing recovery/MFA/security regression coverage, update registry evidence for A080/A087/A092, and verify canonical Admin 100 becomes 83 implemented / 0 modelled / 17 provider-configuration-required."},
+    {"id": "C008", "title": "Complete remaining 17 monetization capabilities", "definitionOfDone": "Each remaining A071-A095 capability has safe, non-deceptive end-to-end behavior, real provider configuration where actually required, measurement, owner controls and tests. Operational baseline is 8/25 verified."},
     {"id": "C003", "title": "Production auth/deployment hardening", "definitionOfDone": "Production secrets, sole-owner recovery/security controls, HTTPS deployment, rate/CSRF/session validation, backups, monitoring and final security QA are verified."},
     {"id": "C015", "title": "Physical Android + public deployment QA", "definitionOfDone": "Canonical HTTPS backend is configured in Android, APK/AAB is signed, Web/PWA and Android are tested on real devices, and production monitoring/backups are active."},
     {"id": "C016", "title": "Multi-session coaching effectiveness trends", "definitionOfDone": "Completed C014 comparisons roll into confidence-calibrated multi-session trends without turning correlations or random outcomes into causal claims."}
