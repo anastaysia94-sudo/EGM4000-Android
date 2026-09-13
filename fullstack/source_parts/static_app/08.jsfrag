@@ -1,0 +1,21 @@
+
+const _adminC008Base=admin;
+admin=async function(){
+  await _adminC008Base();
+  if(!S.me||S.me.role!=='owner')return;
+  try{
+    const data=await api('/api/admin/monetization');
+    const grid=document.querySelector('.content .grid');
+    if(!grid)return;
+    const rows=data.channels.map(ch=>{
+      const c=ch.config||{};
+      return `<div class="event monetization-row" data-id="${esc(ch.id)}"><div class="topline"><div><b>${esc(ch.id)} · ${esc(ch.title||'Monetization capability')}</b><p class="muted">Provider-neutral configuration. Credentials are never stored here.</p></div><span class="pill">${esc((ch.provider_status||'configuration_required').replaceAll('_',' '))}</span></div><div class="row"><div><label>Provider/readiness</label><select class="mstate"><option value="configuration_required" ${ch.provider_status==='configuration_required'?'selected':''}>Configuration required</option><option value="configured" ${ch.provider_status==='configured'?'selected':''}>Configured</option><option value="verified" ${ch.provider_status==='verified'?'selected':''}>Verified</option><option value="disabled" ${ch.provider_status==='disabled'?'selected':''}>Disabled</option></select></div><div><label>Provider label</label><input class="mprovider" value="${esc(c.provider||'')}" placeholder="e.g. Stripe, PayPal, manual"></div></div><div class="row"><div><label>Pricing / business model</label><input class="mprice" value="${esc(c.pricing||'')}" placeholder="$9/mo, 5% fee, quote-based…"></div><div><label>Public destination</label><input class="murl" value="${esc(c.public_url||'')}" placeholder="https://…"></div></div><label>Owner notes</label><textarea class="mnotes" placeholder="Launch requirements, restrictions, provider steps…">${esc(ch.notes||'')}</textarea><div class="actions"><label class="pill"><input class="menabled" type="checkbox" ${ch.enabled?'checked':''}> Enabled</label><button class="aqua msave">Save configuration</button></div></div>`
+    }).join('');
+    grid.insertAdjacentHTML('beforeend',`<div class="card span12" id="monetizationControl"><div class="topline"><div><div class="tag">C008 · Monetization Control Center</div><h2>25 monetization capabilities, no fake provider readiness.</h2></div><span class="pill">${data.summary.enabled}/${data.summary.total} enabled</span></div><p class="muted">${esc(data.secret_policy)}</p><div class="actions"><span class="pill">${data.summary.configuration_required||0} configuration required</span><span class="pill">${data.summary.configured||0} configured</span><span class="pill">${data.summary.verified||0} verified</span><span class="pill">${data.summary.disabled||0} disabled</span></div><div id="monetizationRows">${rows}</div></div>`);
+    document.querySelectorAll('.monetization-row .msave').forEach(btn=>btn.onclick=async()=>{
+      const row=btn.closest('.monetization-row');
+      const payload={id:row.dataset.id,provider_status:row.querySelector('.mstate').value,enabled:row.querySelector('.menabled').checked,notes:row.querySelector('.mnotes').value,config:{provider:row.querySelector('.mprovider').value,pricing:row.querySelector('.mprice').value,public_url:row.querySelector('.murl').value}};
+      try{await post('/api/admin/monetization',payload);btn.textContent='Saved ✓';setTimeout(()=>admin(),500)}catch(e){alert(e.message)}
+    })
+  }catch(e){console.warn('monetization control center unavailable',e)}
+};
