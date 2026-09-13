@@ -2,6 +2,7 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 import json
+from storage import scalar
 
 SAFE_GOAL_TYPES = {
     "tip_reviews": {"title": "Review coaching evidence", "unit": "rated tips"},
@@ -204,14 +205,14 @@ def _event_dimension(events, keys):
 
 def _goal_current(con, user_id, goal_type):
     if goal_type == "tip_reviews":
-        return int(con.execute("SELECT COUNT(*) FROM return_tip_feedback WHERE user_id=?", (user_id,)).fetchone()[0])
+        return int(scalar(con, "SELECT COUNT(*) FROM return_tip_feedback WHERE user_id=?", (user_id,)) or 0)
     if goal_type == "reflection_notes":
-        return int(con.execute("SELECT COUNT(*) FROM return_notes WHERE user_id=?", (user_id,)).fetchone()[0])
+        return int(scalar(con, "SELECT COUNT(*) FROM return_notes WHERE user_id=?", (user_id,)) or 0)
     if goal_type == "evidence_days":
         dates = set()
         for table, col in (("gameplay_sessions", "started_at"), ("live_sessions", "started_at")):
             rows = con.execute(f"SELECT {col} FROM {table} WHERE user_id=?", (user_id,)).fetchall()
-            dates.update(str(r[0])[:10] for r in rows if r[0])
+            dates.update(str(r[col])[:10] for r in rows if r[col])
         return len(dates)
     return 0
 
