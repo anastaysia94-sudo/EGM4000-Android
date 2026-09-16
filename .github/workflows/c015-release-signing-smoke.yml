@@ -54,7 +54,10 @@ jobs:
       - name: Verify signatures and package identity
         shell: bash
         run: |
-          apksigner verify --verbose android-egm4000/app/build/outputs/apk/release/app-release.apk
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          test -x "$BUILD_TOOLS/apksigner"
+          test -x "$BUILD_TOOLS/aapt"
+          "$BUILD_TOOLS/apksigner" verify --verbose android-egm4000/app/build/outputs/apk/release/app-release.apk
           jarsigner -verify -strict android-egm4000/app/build/outputs/bundle/release/app-release.aab
-          aapt dump badging android-egm4000/app/build/outputs/apk/release/app-release.apk | grep "package: name='com.smartpickshop.egm4000'"
+          "$BUILD_TOOLS/aapt" dump badging android-egm4000/app/build/outputs/apk/release/app-release.apk | grep "package: name='com.smartpickshop.egm4000'"
           echo 'C015 release signing plumbing verified with a disposable CI-only key; this is not the production signing identity.'
