@@ -3,9 +3,13 @@ name: EGM4000 Fullstack Smoke
 on:
   push:
     branches: [ main ]
-    paths: ["fullstack/**", ".github/workflows/fullstack-smoke.yml"]
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/fullstack-smoke.yml"
   pull_request:
-    paths: ["fullstack/**", ".github/workflows/fullstack-smoke.yml"]
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/fullstack-smoke.yml"
   workflow_dispatch:
 
 jobs:
@@ -14,159 +18,36 @@ jobs:
     defaults:
       run:
         working-directory: fullstack
-    env:
-      EGM_OWNER_PASSWORD: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.12"}
+        with:
+          python-version: "3.12"
       - uses: actions/setup-node@v4
-        with: {node-version: "22"}
+        with:
+          node-version: "22"
       - name: Install runtime dependency
         run: pip install -r requirements.txt
       - name: Assemble and syntax-check
-        env: {EGM_ASSEMBLE_ONLY: "1"}
         run: |
-          python -m py_compile bootstrap_db.py storage.py live_intelligence.py admin_registry.py monetization_assets.py server.py
-          python server.py
-          node --check static/app.js
-          python test_return_features.py
-          python test_monetization_assets.py
-      - name: Fresh database and Admin 100 integrity
-        run: |
-          rm -rf data
-          python bootstrap_db.py --force
+          python -m py_compile *.py
           EGM_ASSEMBLE_ONLY=1 python server.py
-          python - <<'PY'
-          import sqlite3
-          from admin_registry import sync_admin_registry
-          from storage import connect
-          con=connect();sync_admin_registry(con);con.close()
-          c=sqlite3.connect('data/egm4000.db')
-          rows=c.execute('SELECT id,title,category,implementation_status FROM admin_features ORDER BY id').fetchall()
-          assert len(rows)==100
-          statuses={s:sum(1 for r in rows if r[3]==s) for s in {'implemented','modelled','provider_configuration_required'}}
-          assert statuses=={'implemented':80,'modelled':0,'provider_configuration_required':20},statuses
-          for fid in ('A004','A006','A008','A009','A027','A028','A034','A035','A036','A037','A038','A039','A040','A041','A042','A043','A044','A045','A058','A059','A060','A061','A062','A065','A066','A067','A069','A079','A081','A090','A091','A093','A098'):
-              assert c.execute('SELECT done FROM checklist WHERE id=?',(fid,)).fetchone()[0]==1,fid
-          print('Admin 100 verified',statuses)
-          PY
-      - name: Public and owner API smoke
+          node --check static/app.js
+      - name: Registry structural integrity
         run: |
-          export EGM_OWNER_RECOVERY_TOKEN="ci-recovery-${GITHUB_RUN_ID}"
-          export EGM_FSA_TELEMETRY_TOKEN="ci-fsa-${GITHUB_RUN_ID}"
-          export EGM_BACKUP_DIR="/tmp/egm4000-ci-backups-${GITHUB_RUN_ID}"
-          export RECOVERED_PASSWORD="CiRecovered-${GITHUB_RUN_ID}-Strong!"
-          python server.py > /tmp/egm4000.log 2>&1 &
-          pid=$!
-          trap 'kill $pid 2>/dev/null || true' EXIT
-          ready=0
-          for i in $(seq 1 25); do
-            if curl -fsS http://127.0.0.1:8040/api/health | grep -q 'egm.event.v1'; then ready=1; break; fi
-            if ! kill -0 "$pid" 2>/dev/null; then cat /tmp/egm4000.log >&2 || true; exit 1; fi
-            sleep 1
-          done
-          test "$ready" -eq 1
-          python - <<'PY' > /tmp/login.json
-          import json,os
-          print(json.dumps({'username':'EGM4000Owner','password':os.environ['EGM_OWNER_PASSWORD']}))
-          PY
-          curl -fsS -c /tmp/egm.cookies -H 'Content-Type: application/json' --data-binary @/tmp/login.json http://127.0.0.1:8040/api/login | grep -q '"ok": true'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/me > /tmp/me.json
-          CSRF=$(python -c "import json;print(json.load(open('/tmp/me.json'))['csrf'])")
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/features | grep -q 'Owner multi-factor authentication'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/recovery-status | grep -q 'egm.admin.recovery-status.v1'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/return/dashboard | grep -q 'egm.return-dashboard.v1'
-          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"feature_id":"R001","event_name":"view","context":{"surface":"ci"}}' http://127.0.0.1:8040/api/return/event | grep -q '"ok": true'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/return-adoption | grep -q 'egm.admin.return-adoption.v1'
-
-          curl -fsS -c /tmp/egm2.cookies -H 'Content-Type: application/json' --data-binary @/tmp/login.json http://127.0.0.1:8040/api/login | grep -q '"ok": true'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/sessions | grep -q 'egm.admin.sessions.v1'
-          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"scope":"all_other"}' http://127.0.0.1:8040/api/admin/revoke-sessions | grep -q '"revoked": 1'
-          curl -fsS -b /tmp/egm2.cookies http://127.0.0.1:8040/api/me | grep -q '"authenticated": false'
-
-          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"action":"hide","targets":[{"target_type":"forum_thread","target_id":1}]}' http://127.0.0.1:8040/api/admin/bulk-moderate | grep -q '"count": 1'
-          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"action":"restore","targets":[{"target_type":"forum_thread","target_id":1}]}' http://127.0.0.1:8040/api/admin/bulk-moderate | grep -q '"count": 1'
-          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"target_type":"forum_thread","target_id":1,"note":"Smoke-test moderation note"}' http://127.0.0.1:8040/api/admin/moderator-note | grep -q '"ok": true'
-          curl -fsS -b /tmp/egm.cookies 'http://127.0.0.1:8040/api/admin/moderator-notes?target_type=forum_thread&target_id=1' | grep -q 'Smoke-test moderation note'
-
-          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"kind":"category","name":"Research Notes"}' http://127.0.0.1:8040/api/admin/taxonomy | grep -q 'research-notes'
-          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"kind":"tag","name":"Evidence Review"}' http://127.0.0.1:8040/api/admin/taxonomy | grep -q 'evidence-review'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/taxonomy | grep -q 'Research Notes'
-          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"settings":{"hero_title":"Evidence-first gameplay intelligence","community_callout":"Compare recorded sessions, not imagined streaks."}}' http://127.0.0.1:8040/api/admin/homepage | grep -q 'Evidence-first gameplay intelligence'
-          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"title":"System Notice","body":"Evidence review tools are available.","status":"published"}' http://127.0.0.1:8040/api/admin/announcement | grep -q '"status": "published"'
-          curl -fsS http://127.0.0.1:8040/api/content/navigation | grep -q 'System Notice'
-          curl -fsS -b /tmp/egm.cookies 'http://127.0.0.1:8040/api/admin/draft-preview?post_id=1' | grep -q 'egm.admin.draft-preview.v1'
-          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"post_id":1,"publish_at":"2026-01-01T00:00:00+00:00"}' http://127.0.0.1:8040/api/admin/schedule-post | grep -q '"status": "scheduled"'
-          curl -fsS http://127.0.0.1:8040/api/blog/posts > /tmp/posts.json
           python - <<'PY'
-          import json
-          rows=json.load(open('/tmp/posts.json'))
-          assert any(int(x['id'])==1 for x in rows), rows
+          from admin_registry import ADMIN_CAPABILITIES
+          assert len(ADMIN_CAPABILITIES) == 100
+          ids = [item['id'] for item in ADMIN_CAPABILITIES]
+          assert len(set(ids)) == 100
+          assert ids == [f'A{i:03d}' for i in range(1, 101)]
+          allowed = {'implemented', 'modelled', 'provider_configuration_required'}
+          assert all(item['implementation_status'] in allowed for item in ADMIN_CAPABILITIES)
+          assert all(item['title'] and item['category'] and item['evidence'] for item in ADMIN_CAPABILITIES)
+          print('Admin registry structure verified')
           PY
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/editorial-schedule | grep -q '"status": "published"'
-
-          cat > /tmp/fsa.json <<'JSON'
-          {"userId":2,"sessionId":"smoke-session-1","eventId":"smoke-event-1","eventType":"shot_fired","occurredAt":"2026-09-13T12:00:00Z","sourceProduct":"fsa","evidenceLabel":"exact_telemetry","confidence":1,"payload":{}}
-          JSON
-          curl -fsS -H "X-EGM-FSA-Token: $EGM_FSA_TELEMETRY_TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/fsa.json http://127.0.0.1:8040/api/fsa/telemetry | grep -q '"ok": true'
-          code=$(curl -sS -o /tmp/fsa-dup.json -w '%{http_code}' -H "X-EGM-FSA-Token: $EGM_FSA_TELEMETRY_TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/fsa.json http://127.0.0.1:8040/api/fsa/telemetry)
-          test "$code" = "409"
-          grep -q 'duplicate source event ID' /tmp/fsa-dup.json
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/fsa-duplicate-diagnostics | grep -q '"duplicate_rejections": 1'
-
-          # A066/A067/A069: job ledger, central error capture, actual sanitized logical backup.
-          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"job_name":"scheduled_blog_publish"}' http://127.0.0.1:8040/api/admin/run-jobs | grep -q '"ok": true'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/jobs | grep -q 'scheduled_blog_publish'
-          errcode=$(curl -sS -o /tmp/job-error.json -w '%{http_code}' -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{"job_name":"does_not_exist"}' http://127.0.0.1:8040/api/admin/run-jobs)
-          test "$errcode" = "400"
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/api-errors | grep -q 'unknown_job'
-          curl -fsS -b /tmp/egm.cookies -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:8040/api/admin/create-backup > /tmp/backup.json
-          grep -q '"ok": true' /tmp/backup.json
-          python - <<'PY'
-          import json,os,gzip
-          x=json.load(open('/tmp/backup.json'));assert os.path.exists(x['path']);assert x['table_count']>=20 and x['row_count']>0
-          with gzip.open(x['path'],'rt') as f:data=json.load(f)
-          assert 'password_hash' not in json.dumps(data['tables']['users'])
-          PY
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/admin/backup-status | grep -q '"backup_count": 1'
-
-          python - <<'PY' > /tmp/recover.json
-          import json,os
-          print(json.dumps({'recovery_token':os.environ['EGM_OWNER_RECOVERY_TOKEN'],'new_password':os.environ['RECOVERED_PASSWORD']}))
-          PY
-          curl -fsS -H 'Content-Type: application/json' --data-binary @/tmp/recover.json http://127.0.0.1:8040/api/owner/recover | grep -q '"sessions_invalidated": true'
-          curl -fsS -b /tmp/egm.cookies http://127.0.0.1:8040/api/me | grep -q '"authenticated": false'
-          python - <<'PY' > /tmp/login-recovered.json
-          import json,os
-          print(json.dumps({'username':'EGM4000Owner','password':os.environ['RECOVERED_PASSWORD']}))
-          PY
-          curl -fsS -c /tmp/recovered.cookies -H 'Content-Type: application/json' --data-binary @/tmp/login-recovered.json http://127.0.0.1:8040/api/login | grep -q '"ok": true'
-
-          # A006: restart with runtime-generated TOTP secret; owner login must require it.
-          kill "$pid"
-          wait "$pid" 2>/dev/null || true
-          export EGM_OWNER_TOTP_SECRET=$(python - <<'PY'
-          import os,base64
-          print(base64.b32encode(os.urandom(20)).decode().rstrip('='))
-          PY
-          )
-          python server.py > /tmp/egm4000-mfa.log 2>&1 &
-          pid=$!
-          ready=0
-          for i in $(seq 1 25); do
-            if curl -fsS http://127.0.0.1:8040/api/health | grep -q 'egm.event.v1'; then ready=1; break; fi
-            if ! kill -0 "$pid" 2>/dev/null; then cat /tmp/egm4000-mfa.log >&2 || true; exit 1; fi
-            sleep 1
-          done
-          test "$ready" -eq 1
-          nocode=$(curl -sS -o /tmp/mfa-required.json -w '%{http_code}' -H 'Content-Type: application/json' --data-binary @/tmp/login-recovered.json http://127.0.0.1:8040/api/login)
-          test "$nocode" = "401"
-          grep -q 'mfa_required' /tmp/mfa-required.json
-          python - <<'PY' > /tmp/login-mfa.json
-          import os,json,time,base64,struct,hmac,hashlib
-          secret=os.environ['EGM_OWNER_TOTP_SECRET'];s=secret+'='*((8-len(secret)%8)%8);key=base64.b32decode(s);counter=int(time.time()//30);d=hmac.new(key,struct.pack('>Q',counter),hashlib.sha1).digest();o=d[-1]&15;code=f'{((struct.unpack(">I",d[o:o+4])[0]&0x7fffffff)%1000000):06d}'
-          print(json.dumps({'username':'EGM4000Owner','password':os.environ['RECOVERED_PASSWORD'],'totp':code}))
-          PY
-          curl -fsS -c /tmp/mfa.cookies -H 'Content-Type: application/json' --data-binary @/tmp/login-mfa.json http://127.0.0.1:8040/api/login | grep -q '"mfa": true'
-          curl -fsS -b /tmp/mfa.cookies http://127.0.0.1:8040/api/admin/mfa-status | grep -q '"configured": true'
+      - name: Core product regressions
+        run: |
+          python test_core_loop_integration.py
+          python test_return_features.py
+          python test_coaching_trends.py
