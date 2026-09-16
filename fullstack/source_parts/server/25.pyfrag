@@ -1,0 +1,36 @@
+
+# C016 confidence-calibrated multi-session coaching trends.
+from coaching_trends import migrate_coaching_trends,owner_overview,user_trends
+
+_c016=db()
+try:migrate_coaching_trends(_c016)
+finally:_c016.close()
+
+_c016_get_base=App.do_GET
+def _c016_do_GET(self):
+    parsed=urlparse(self.path);path=parsed.path;q=parse_qs(parsed.query)
+    if path=='/api/coaching/trends':
+        s=self.need()
+        if not s:return
+        platform=clean(qval(q,'platform',''),80) or None
+        con=db()
+        try:payload=user_trends(con,s['id'],platform)
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/mobile/coaching-trends':
+        s=self.mobile()
+        if not s:return self.json({'error':'mobile_auth_required'},401)
+        platform=clean(qval(q,'platform',''),80) or None
+        con=db()
+        try:payload=user_trends(con,s['id'],platform)
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/admin/coaching-trend-overview':
+        s=self.need(owner=True)
+        if not s:return
+        con=db()
+        try:payload=owner_overview(con)
+        finally:con.close()
+        return self.json(payload)
+    return _c016_get_base(self)
+App.do_GET=_c016_do_GET
