@@ -1,0 +1,38 @@
+name: EGM4000 C008 Marketplace and Licensing
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-marketplace-licensing-smoke.yml"
+  pull_request:
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-marketplace-licensing-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  marketplace-licensing:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fullstack
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install runtime dependency
+        run: pip install -r requirements.txt
+      - name: Contract, source assembly and syntax checks
+        env:
+          EGM_ASSEMBLE_ONLY: "1"
+        run: |
+          python -m py_compile storage.py marketplace_licensing.py server.py test_marketplace_licensing.py
+          python server.py
+          node --check static/app.js
+          python test_marketplace_licensing.py
