@@ -1,0 +1,27 @@
+name: Validate FSA Supabase consumer
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/20260916_egm_fsa_supabase_consumer_v1.sql'
+      - 'supabase/tests/validate_fsa_consumer_contract.py'
+      - '.github/workflows/validate-fsa-supabase-consumer.yml'
+  push:
+    branches: [main, egm-fsa-supabase-consumer-v1]
+    paths:
+      - 'supabase/migrations/20260916_egm_fsa_supabase_consumer_v1.sql'
+      - 'supabase/tests/validate_fsa_consumer_contract.py'
+      - '.github/workflows/validate-fsa-supabase-consumer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate importer guardrails
+        run: python3 supabase/tests/validate_fsa_consumer_contract.py
