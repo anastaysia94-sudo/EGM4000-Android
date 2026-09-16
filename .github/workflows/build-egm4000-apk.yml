@@ -1,4 +1,4 @@
-name: Build EGM4000 Android v0.2.1 APK
+name: Build EGM4000 Android v0.3 APK + AAB
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ on:
       - ".github/workflows/build-egm4000-apk.yml"
 
 jobs:
-  build-debug-apk:
+  build-android-artifacts:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -35,26 +35,32 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
-      - name: Verify v0.2.1 source contract
+      - name: Verify v0.3 production-handoff contract
         run: |
-          grep -q '0.2.1-server-health' android-egm4000/app/build.gradle.kts
-          grep -q 'ServerSetupActivity' android-egm4000/app/src/main/AndroidManifest.xml
-          grep -q '/api/health' android-egm4000/app/src/main/java/com/smartpickshop/egm4000/ServerSetupActivity.java
-          grep -q 'egm.event.v1' android-egm4000/app/src/main/java/com/smartpickshop/egm4000/ServerSetupActivity.java
+          grep -q '0.3.0-production-ready' android-egm4000/app/build.gradle.kts
+          grep -q 'EGM_API_BASE_URL' android-egm4000/app/build.gradle.kts
+          grep -q '/api/health/ready' android-egm4000/app/src/main/java/com/smartpickshop/egm4000/ServerSetupActivity.java
+          grep -q 'usesCleartextTraffic="false"' android-egm4000/app/src/main/AndroidManifest.xml
+          grep -q 'allowBackup="false"' android-egm4000/app/src/main/AndroidManifest.xml
           grep -q '/api/mobile/login' android-egm4000/app/src/main/java/com/smartpickshop/egm4000/MainActivity.java
           grep -q '/api/mobile/sync' android-egm4000/app/src/main/java/com/smartpickshop/egm4000/MainActivity.java
           grep -q '/api/mobile/tips' android-egm4000/app/src/main/java/com/smartpickshop/egm4000/MainActivity.java
           grep -q 'AndroidKeyStore' android-egm4000/app/src/main/java/com/smartpickshop/egm4000/SecureTokenStore.java
-          grep -q 'Share JSON' android-egm4000/app/src/main/java/com/smartpickshop/egm4000/MainActivity.java
-          grep -q 'Import / Paste JSON' android-egm4000/app/src/main/java/com/smartpickshop/egm4000/MainActivity.java
 
-      - name: Build installable debug APK
+      - name: Build CI-signed debug APK and AAB
         working-directory: android-egm4000
-        run: gradle :app:assembleDebug --stacktrace
+        env:
+          EGM_API_BASE_URL: ${{ vars.EGM_API_BASE_URL }}
+        run: |
+          EXTRA=""
+          if [ -n "$EGM_API_BASE_URL" ]; then EXTRA="-PEGM_API_BASE_URL=$EGM_API_BASE_URL"; fi
+          gradle :app:assembleDebug :app:bundleDebug $EXTRA --stacktrace
 
-      - name: Upload APK artifact
+      - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: EGM4000-Android-v0.2.1-debug-apk
-          path: android-egm4000/app/build/outputs/apk/debug/app-debug.apk
+          name: EGM4000-Android-v0.3-debug-signed
+          path: |
+            android-egm4000/app/build/outputs/apk/debug/app-debug.apk
+            android-egm4000/app/build/outputs/bundle/debug/app-debug.aab
           if-no-files-found: error
