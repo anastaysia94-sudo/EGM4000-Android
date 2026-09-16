@@ -25,7 +25,7 @@ def main():
 
         plan=save_plan(con,{'title':'Operator Plus','description':'Evidence tools and collaboration.','price_label':'External billing','features':sorted(FEATURES),'seat_limit':3,'status':'active'})
         assert set(plan['features'])==FEATURES and plan['seatLimit']==3 and plan['status']=='active'
-        assert len(public_plans(con)['plans'])==1 and 'does not prove payment' in public_plans(con)['billingBoundary']
+        assert len(public_plans(con)['plans'])==1 and 'do not prove payment' in public_plans(con)['billingBoundary']
 
         rid=request_plan(con,2,plan['id'],'Need research and team tools')
         assert rid.startswith('pr_')
