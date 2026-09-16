@@ -1,0 +1,30 @@
+// C008 A077 priority processing: entitlement-gated queue ordering for open report requests.
+const _c008PriorityTodayBase=today;
+today=async function(){
+  await _c008PriorityTodayBase();
+  if(!S.me)return;
+  try{
+    const x=await api('/api/priority-processing/status');
+    if(!x.requests.length)return;
+    const grid=document.querySelector('.content .grid');if(!grid)return;
+    const rows=x.requests.map(r=>`<div class="event c008-priority-row" data-id="${esc(r.requestId)}"><div class="topline"><b>${esc(r.packageTitle)}</b><span class="pill ${r.priority?'good':''}">${r.priority?'priority active':'standard queue'}</span></div><p class="muted">Request ${esc(r.requestStatus.replaceAll('_',' '))} · payment ${esc(r.paymentStatus.replaceAll('_',' '))}</p>${x.entitlement.active?`<button class="c008-priority-toggle ${r.priority?'':'aqua'}" data-action="${r.priority?'remove':'apply'}">${r.priority?'Remove priority':'Apply priority'}</button>`:'<p class="muted">Priority access is not provisioned for this account.</p>'}</div>`).join('');
+    grid.insertAdjacentHTML('beforeend',`<div class="card span12"><div class="tag">A077 · Priority Processing</div><h2>Priority queue for open custom reports</h2><p>${esc(x.serviceBoundary)}</p><p class="muted">${esc(x.paymentBoundary)}</p><div>${rows}</div></div>`);
+    document.querySelectorAll('.c008-priority-toggle').forEach(btn=>btn.onclick=async()=>{const row=btn.closest('.c008-priority-row');try{await post('/api/priority-processing/apply',{action:btn.dataset.action,request_id:row.dataset.id});await today()}catch(e){alert(e.message)}});
+  }catch(e){console.warn('A077 priority status unavailable',e)}
+};
+
+const _c008PriorityAdminBase=admin;
+admin=async function(){
+  await _c008PriorityAdminBase();
+  if(!S.me||S.me.role!=='owner')return;
+  try{
+    const x=await api('/api/admin/priority-processing');
+    const grid=document.querySelector('.content .grid');if(!grid)return;
+    const queue=x.queue.length?x.queue.map(q=>`<div class="event"><div class="topline"><b>#${esc(q.queuePosition)} · ${esc(q.packageTitle)}</b><span class="pill ${q.priority?'good':''}">${q.priority?'priority':'standard'}</span></div><p>${esc(q.displayName||q.username)} · user #${esc(q.userId)}</p><p class="muted">${esc(q.requestStatus.replaceAll('_',' '))} · payment ${esc(q.paymentStatus.replaceAll('_',' '))} · requested ${esc(q.requestCreatedAt)}</p></div>`).join(''):'<p class="muted">No open report requests.</p>';
+    const ents=x.entitlements.length?x.entitlements.map(e=>`<div class="event"><div class="topline"><b>#${esc(e.userId)} · ${esc(e.displayName||e.username)}</b><span class="pill ${e.status==='active'?'good':''}">${esc(e.status)}</span></div><p class="muted">${esc(e.source.replaceAll('_',' '))} · ${esc(e.updatedAt)}</p>${e.note?`<p>${esc(e.note)}</p>`:''}</div>`).join(''):'<p class="muted">No A077 entitlements yet.</p>';
+    grid.insertAdjacentHTML('beforeend',`<div class="card span12" id="c008PriorityAdmin"><div class="tag">C008 · A077 Priority Processing</div><h2>Priority report queue + entitlement ledger</h2><p>${esc(x.serviceBoundary)}</p><p class="muted">${esc(x.paymentBoundary)}</p><div class="grid"><div class="card span7"><h3>Actual processing order</h3>${queue}</div><div class="card span5"><label>User ID</label><input id="c008PriorityUser" inputmode="numeric" placeholder="Registered user ID"><label>Provisioning source</label><select id="c008PrioritySource"><option value="complimentary">complimentary</option><option value="manual_external_unverified">manual external / unverified</option></select><label>Owner note</label><textarea id="c008PriorityNote" maxlength="2000"></textarea><div class="actions"><button id="c008PriorityGrant" class="aqua">Grant priority access</button><button id="c008PriorityRevoke">Revoke access</button></div><h3>Entitlements</h3>${ents}</div></div></div>`);
+    const payload=action=>({action,user_id:document.querySelector('#c008PriorityUser').value,source:document.querySelector('#c008PrioritySource').value,note:document.querySelector('#c008PriorityNote').value});
+    document.querySelector('#c008PriorityGrant').onclick=async()=>{try{await post('/api/admin/priority-processing-entitlement',payload('grant'));await admin()}catch(e){alert(e.message)}};
+    document.querySelector('#c008PriorityRevoke').onclick=async()=>{try{await post('/api/admin/priority-processing-entitlement',payload('revoke'));await admin()}catch(e){alert(e.message)}};
+  }catch(e){console.warn('A077 priority admin unavailable',e)}
+};
