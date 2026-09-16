@@ -1,0 +1,136 @@
+name: EGM4000 C008 Priority Processing Add-on
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-priority-processing-smoke.yml"
+  pull_request:
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-priority-processing-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  priority-processing-addon:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fullstack
+    env:
+      EGM_OWNER_PASSWORD: ${{ github.sha }}
+      EGM_PORT: "8047"
+      TEST_USER_PASSWORD: "C008-Priority-Test-Strong-2026"
+      TEST_USER2_PASSWORD: "C008-Priority-Test2-Strong-2026"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install runtime dependency
+        run: pip install -r requirements.txt
+      - name: Contract and syntax checks
+        env:
+          EGM_ASSEMBLE_ONLY: "1"
+        run: |
+          python -m py_compile bootstrap_db.py storage.py custom_reports.py priority_processing.py server.py
+          python server.py
+          node --check static/app.js
+          python test_priority_processing.py
+      - name: HTTP smoke real queue ordering and boundaries
+        run: |
+          rm -rf data
+          python bootstrap_db.py --force
+          python server.py > /tmp/egm4000-a077.log 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 25); do
+            if curl -fsS http://127.0.0.1:8047/api/health | grep -q 'egm.event.v1'; then ready=1; break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then cat /tmp/egm4000-a077.log >&2 || true; exit 1; fi
+            sleep 1
+          done
+          test "$ready" -eq 1
+
+          python - <<'PY' > /tmp/owner-login.json
+          import json,os
+          print(json.dumps({'username':'EGM4000Owner','password':os.environ['EGM_OWNER_PASSWORD']}))
+          PY
+          curl -fsS -c /tmp/owner.cookies -H 'Content-Type: application/json' --data-binary @/tmp/owner-login.json http://127.0.0.1:8047/api/login | grep -q '"ok": true'
+          curl -fsS -b /tmp/owner.cookies http://127.0.0.1:8047/api/me > /tmp/owner-me.json
+          OWNER_CSRF=$(python -c "import json;print(json.load(open('/tmp/owner-me.json'))['csrf'])")
+          curl -fsS -b /tmp/owner.cookies -H "X-CSRF-Token: $OWNER_CSRF" -H 'Content-Type: application/json' -d '{"title":"Priority Queue Test Report","description":"Evidence-first report.","deliverables":["Evidence summary"],"price_label":"External checkout","turnaround_label":"Owner estimate","status":"active"}' http://127.0.0.1:8047/api/admin/custom-report-package > /tmp/pkg.json
+          PACKAGE_ID=$(python -c "import json;print(json.load(open('/tmp/pkg.json'))['package']['id'])")
+
+          python - <<'PY' > /tmp/register1.json
+          import json,os
+          print(json.dumps({'display_name':'Priority Test One','username':'priority_test_1','email':'priority-1@example.test','password':os.environ['TEST_USER_PASSWORD'],'favorite_platform':'Fire Kirin','skill_focus':'Evidence review'}))
+          PY
+          curl -fsS -H 'Content-Type: application/json' --data-binary @/tmp/register1.json http://127.0.0.1:8047/api/register | grep -q '"ok": true'
+          python - <<'PY' > /tmp/login1.json
+          import json,os
+          print(json.dumps({'username':'priority_test_1','password':os.environ['TEST_USER_PASSWORD']}))
+          PY
+          curl -fsS -c /tmp/user1.cookies -H 'Content-Type: application/json' --data-binary @/tmp/login1.json http://127.0.0.1:8047/api/login | grep -q '"ok": true'
+          curl -fsS -b /tmp/user1.cookies http://127.0.0.1:8047/api/me > /tmp/user1-me.json
+          U1_CSRF=$(python -c "import json;print(json.load(open('/tmp/user1-me.json'))['csrf'])")
+          U1_ID=$(python -c "import json;print(json.load(open('/tmp/user1-me.json'))['user']['id'])")
+          curl -fsS -b /tmp/user1.cookies -H "X-CSRF-Token: $U1_CSRF" -H 'Content-Type: application/json' -d "{\"package_id\":\"$PACKAGE_ID\",\"request_note\":\"First request\"}" http://127.0.0.1:8047/api/custom-report-request > /tmp/r1.json
+          R1=$(python -c "import json;print(json.load(open('/tmp/r1.json'))['request']['id'])")
+
+          python - <<'PY' > /tmp/register2.json
+          import json,os
+          print(json.dumps({'display_name':'Priority Test Two','username':'priority_test_2','email':'priority-2@example.test','password':os.environ['TEST_USER2_PASSWORD'],'favorite_platform':'Juwa','skill_focus':'Evidence review'}))
+          PY
+          curl -fsS -H 'Content-Type: application/json' --data-binary @/tmp/register2.json http://127.0.0.1:8047/api/register | grep -q '"ok": true'
+          python - <<'PY' > /tmp/login2.json
+          import json,os
+          print(json.dumps({'username':'priority_test_2','password':os.environ['TEST_USER2_PASSWORD']}))
+          PY
+          curl -fsS -c /tmp/user2.cookies -H 'Content-Type: application/json' --data-binary @/tmp/login2.json http://127.0.0.1:8047/api/login | grep -q '"ok": true'
+          curl -fsS -b /tmp/user2.cookies http://127.0.0.1:8047/api/me > /tmp/user2-me.json
+          U2_CSRF=$(python -c "import json;print(json.load(open('/tmp/user2-me.json'))['csrf'])")
+          U2_ID=$(python -c "import json;print(json.load(open('/tmp/user2-me.json'))['user']['id'])")
+          curl -fsS -b /tmp/user2.cookies -H "X-CSRF-Token: $U2_CSRF" -H 'Content-Type: application/json' -d "{\"package_id\":\"$PACKAGE_ID\",\"request_note\":\"Second request\"}" http://127.0.0.1:8047/api/custom-report-request > /tmp/r2.json
+          R2=$(python -c "import json;print(json.load(open('/tmp/r2.json'))['request']['id'])")
+
+          blocked=$(curl -sS -o /tmp/blocked.json -w '%{http_code}' -b /tmp/user1.cookies -H "X-CSRF-Token: $U1_CSRF" -H 'Content-Type: application/json' -d "{\"action\":\"apply\",\"request_id\":\"$R1\"}" http://127.0.0.1:8047/api/priority-processing/apply)
+          test "$blocked" = "403"
+          grep -q 'priority_entitlement_required' /tmp/blocked.json
+
+          fakepaid=$(curl -sS -o /tmp/fakepaid.json -w '%{http_code}' -b /tmp/owner.cookies -H "X-CSRF-Token: $OWNER_CSRF" -H 'Content-Type: application/json' -d "{\"action\":\"grant\",\"user_id\":$U1_ID,\"source\":\"provider_verified\",\"note\":\"must fail\"}" http://127.0.0.1:8047/api/admin/priority-processing-entitlement)
+          test "$fakepaid" = "400"
+          grep -q 'unsupported_priority_entitlement_source' /tmp/fakepaid.json
+
+          curl -fsS -b /tmp/owner.cookies -H "X-CSRF-Token: $OWNER_CSRF" -H 'Content-Type: application/json' -d "{\"action\":\"grant\",\"user_id\":$U1_ID,\"source\":\"complimentary\",\"note\":\"HTTP smoke access\"}" http://127.0.0.1:8047/api/admin/priority-processing-entitlement | grep -q '"active": true'
+          curl -fsS -b /tmp/owner.cookies -H "X-CSRF-Token: $OWNER_CSRF" -H 'Content-Type: application/json' -d "{\"action\":\"grant\",\"user_id\":$U2_ID,\"source\":\"complimentary\",\"note\":\"ownership test\"}" http://127.0.0.1:8047/api/admin/priority-processing-entitlement | grep -q '"active": true'
+          curl -fsS -b /tmp/user1.cookies -H "X-CSRF-Token: $U1_CSRF" -H 'Content-Type: application/json' -d "{\"action\":\"apply\",\"request_id\":\"$R1\"}" http://127.0.0.1:8047/api/priority-processing/apply | grep -q '"active": true'
+
+          cross=$(curl -sS -o /tmp/cross.json -w '%{http_code}' -b /tmp/user2.cookies -H "X-CSRF-Token: $U2_CSRF" -H 'Content-Type: application/json' -d "{\"action\":\"apply\",\"request_id\":\"$R1\"}" http://127.0.0.1:8047/api/priority-processing/apply)
+          test "$cross" = "404"
+          grep -q 'priority_report_request_not_found' /tmp/cross.json
+
+          curl -fsS -b /tmp/owner.cookies http://127.0.0.1:8047/api/admin/priority-processing > /tmp/queue.json
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/queue.json'))
+          assert x['queue'][0]['queuePosition']==1
+          assert x['queue'][0]['priority'] is True
+          assert 'not proof of payment' in x['paymentBoundary']
+          assert 'does not guarantee a completion time' in x['serviceBoundary']
+          assert 'provider_verified' not in x['allowedSources']
+          PY
+
+          curl -fsS -b /tmp/owner.cookies -H "X-CSRF-Token: $OWNER_CSRF" -H 'Content-Type: application/json' -d "{\"action\":\"revoke\",\"user_id\":$U1_ID,\"note\":\"HTTP smoke revoke\"}" http://127.0.0.1:8047/api/admin/priority-processing-entitlement | grep -q '"active": false'
+          revoked=$(curl -sS -o /tmp/revoked.json -w '%{http_code}' -b /tmp/user1.cookies -H "X-CSRF-Token: $U1_CSRF" -H 'Content-Type: application/json' -d "{\"action\":\"apply\",\"request_id\":\"$R1\"}" http://127.0.0.1:8047/api/priority-processing/apply)
+          test "$revoked" = "403"
+          curl -fsS -b /tmp/owner.cookies http://127.0.0.1:8047/api/admin/priority-processing > /tmp/queue2.json
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/queue2.json'))
+          assert all(not row['priority'] for row in x['queue'])
+          PY
