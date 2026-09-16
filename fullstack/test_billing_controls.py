@@ -15,7 +15,8 @@ def expect(code,fn,kind=ValueError):
 
 
 def event(event_id,provider,customer,event_type,**extra):
-    payload={'event_id':event_id,'provider':provider,'customer_ref':customer,'event_type':event_type,'status':'active' if event_type.endswith('_active') else 'cancelled','occurred_at':_now()}
+    occurred=datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    payload={'event_id':event_id,'provider':provider,'customer_ref':customer,'event_type':event_type,'status':'active' if event_type.endswith('_active') else 'cancelled','occurred_at':occurred}
     payload.update(extra);return json.dumps(payload,separators=(',',':')).encode()
 
 
