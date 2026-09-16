@@ -1,0 +1,119 @@
+name: EGM4000 C008 Evidence Export Add-on
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-export-addon-smoke.yml"
+  pull_request:
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-export-addon-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  evidence-export-addon:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fullstack
+    env:
+      EGM_OWNER_PASSWORD: ${{ github.sha }}
+      EGM_PORT: "8046"
+      TEST_USER_PASSWORD: "C008-Export-Test-Strong-2026"
+      TEST_USER2_PASSWORD: "C008-Export-Test2-Strong-2026"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install runtime dependency
+        run: pip install -r requirements.txt
+      - name: Contract and syntax checks
+        env:
+          EGM_ASSEMBLE_ONLY: "1"
+        run: |
+          python -m py_compile bootstrap_db.py storage.py export_addon.py server.py
+          python server.py
+          node --check static/app.js
+          python test_export_addon.py
+      - name: HTTP smoke entitlement and owned artifact boundary
+        run: |
+          rm -rf data
+          python bootstrap_db.py --force
+          python server.py > /tmp/egm4000-a076.log 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 25); do
+            if curl -fsS http://127.0.0.1:8046/api/health | grep -q 'egm.event.v1'; then ready=1; break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then cat /tmp/egm4000-a076.log >&2 || true; exit 1; fi
+            sleep 1
+          done
+          test "$ready" -eq 1
+
+          python - <<'PY' > /tmp/register.json
+          import json,os
+          print(json.dumps({'display_name':'Export Test','username':'export_test','email':'export-test@example.test','password':os.environ['TEST_USER_PASSWORD'],'favorite_platform':'Fire Kirin','skill_focus':'Evidence review'}))
+          PY
+          curl -fsS -H 'Content-Type: application/json' --data-binary @/tmp/register.json http://127.0.0.1:8046/api/register | grep -q '"ok": true'
+          python - <<'PY' > /tmp/user-login.json
+          import json,os
+          print(json.dumps({'username':'export_test','password':os.environ['TEST_USER_PASSWORD']}))
+          PY
+          curl -fsS -c /tmp/user.cookies -H 'Content-Type: application/json' --data-binary @/tmp/user-login.json http://127.0.0.1:8046/api/login | grep -q '"ok": true'
+          curl -fsS -b /tmp/user.cookies http://127.0.0.1:8046/api/me > /tmp/user-me.json
+          USER_CSRF=$(python -c "import json;print(json.load(open('/tmp/user-me.json'))['csrf'])")
+          USER_ID=$(python -c "import json;print(json.load(open('/tmp/user-me.json'))['user']['id'])")
+          curl -fsS -b /tmp/user.cookies http://127.0.0.1:8046/api/export-addon/status | grep -q 'not_granted'
+          blocked=$(curl -sS -o /tmp/blocked.json -w '%{http_code}' -b /tmp/user.cookies -H "X-CSRF-Token: $USER_CSRF" -H 'Content-Type: application/json' -d '{"format":"json"}' http://127.0.0.1:8046/api/export-addon/generate)
+          test "$blocked" = "403"
+          grep -q 'export_addon_entitlement_required' /tmp/blocked.json
+
+          python - <<'PY' > /tmp/owner-login.json
+          import json,os
+          print(json.dumps({'username':'EGM4000Owner','password':os.environ['EGM_OWNER_PASSWORD']}))
+          PY
+          curl -fsS -c /tmp/owner.cookies -H 'Content-Type: application/json' --data-binary @/tmp/owner-login.json http://127.0.0.1:8046/api/login | grep -q '"ok": true'
+          curl -fsS -b /tmp/owner.cookies http://127.0.0.1:8046/api/me > /tmp/owner-me.json
+          OWNER_CSRF=$(python -c "import json;print(json.load(open('/tmp/owner-me.json'))['csrf'])")
+          fakepaid=$(curl -sS -o /tmp/fakepaid.json -w '%{http_code}' -b /tmp/owner.cookies -H "X-CSRF-Token: $OWNER_CSRF" -H 'Content-Type: application/json' -d "{\"action\":\"grant\",\"user_id\":$USER_ID,\"source\":\"provider_verified\",\"note\":\"must fail\"}" http://127.0.0.1:8046/api/admin/export-addon-entitlement)
+          test "$fakepaid" = "400"
+          grep -q 'unsupported_entitlement_source' /tmp/fakepaid.json
+          curl -fsS -b /tmp/owner.cookies -H "X-CSRF-Token: $OWNER_CSRF" -H 'Content-Type: application/json' -d "{\"action\":\"grant\",\"user_id\":$USER_ID,\"source\":\"complimentary\",\"note\":\"HTTP smoke access\"}" http://127.0.0.1:8046/api/admin/export-addon-entitlement | grep -q '"active": true'
+          curl -fsS -b /tmp/user.cookies http://127.0.0.1:8046/api/export-addon/status | grep -q 'complimentary'
+          curl -fsS -b /tmp/user.cookies -H "X-CSRF-Token: $USER_CSRF" -H 'Content-Type: application/json' -d '{"format":"json"}' http://127.0.0.1:8046/api/export-addon/generate > /tmp/artifact.json
+          grep -q '"ok": true' /tmp/artifact.json
+          ARTIFACT_ID=$(python -c "import json;print(json.load(open('/tmp/artifact.json'))['artifact']['id'])")
+          python - <<'PY'
+          import json,hashlib
+          x=json.load(open('/tmp/artifact.json'))['artifact']
+          assert x['format']=='json'
+          assert hashlib.sha256(x['content'].encode()).hexdigest()==x['sha256']
+          payload=json.loads(x['content'])
+          assert payload['userId']>0
+          assert 'does not predict random outcomes' in payload['historicalBoundary']
+          PY
+          curl -fsS -b /tmp/user.cookies "http://127.0.0.1:8046/api/export-addon/artifact/$ARTIFACT_ID" | grep -q "$ARTIFACT_ID"
+
+          python - <<'PY' > /tmp/register2.json
+          import json,os
+          print(json.dumps({'display_name':'Export Test 2','username':'export_test_2','email':'export-test-2@example.test','password':os.environ['TEST_USER2_PASSWORD'],'favorite_platform':'Juwa','skill_focus':'Evidence review'}))
+          PY
+          curl -fsS -H 'Content-Type: application/json' --data-binary @/tmp/register2.json http://127.0.0.1:8046/api/register | grep -q '"ok": true'
+          python - <<'PY' > /tmp/user2-login.json
+          import json,os
+          print(json.dumps({'username':'export_test_2','password':os.environ['TEST_USER2_PASSWORD']}))
+          PY
+          curl -fsS -c /tmp/user2.cookies -H 'Content-Type: application/json' --data-binary @/tmp/user2-login.json http://127.0.0.1:8046/api/login | grep -q '"ok": true'
+          cross=$(curl -sS -o /tmp/cross.json -w '%{http_code}' -b /tmp/user2.cookies "http://127.0.0.1:8046/api/export-addon/artifact/$ARTIFACT_ID")
+          test "$cross" = "404"
+          grep -q 'export_artifact_not_found' /tmp/cross.json
+
+          curl -fsS -b /tmp/owner.cookies -H "X-CSRF-Token: $OWNER_CSRF" -H 'Content-Type: application/json' -d "{\"action\":\"revoke\",\"user_id\":$USER_ID,\"note\":\"HTTP smoke revoke\"}" http://127.0.0.1:8046/api/admin/export-addon-entitlement | grep -q '"active": false'
+          revoked=$(curl -sS -o /tmp/revoked.json -w '%{http_code}' -b /tmp/user.cookies -H "X-CSRF-Token: $USER_CSRF" -H 'Content-Type: application/json' -d '{"format":"csv"}' http://127.0.0.1:8046/api/export-addon/generate)
+          test "$revoked" = "403"
