@@ -1,0 +1,71 @@
+
+# C003 production hardening: readiness gate, explicit proxy trust, hardened headers,
+# and SHA-256-at-rest web session tokens. Existing pre-hardening web sessions are
+# intentionally invalidated at cutover; users simply sign in again.
+from production_readiness import evaluate as _production_readiness,require_production_ready as _require_production_ready,session_token_hash as _session_token_hash
+
+_PRODUCTION=str(os.environ.get('EGM_ENV') or '').lower()=='production'
+_TRUST_PROXY=os.environ.get('EGM_TRUST_PROXY','0')=='1'
+_C003_READINESS=_require_production_ready(os.environ)
+
+_c003_client_key_base=App.client_key
+def _c003_client_key(self):
+    socket_ip=(self.client_address[0] or '').strip()
+    ip=socket_ip
+    if _TRUST_PROXY:
+        forwarded=(self.headers.get('X-Forwarded-For') or '').split(',')[0].strip()
+        if forwarded:ip=forwarded
+    ua=self.headers.get('User-Agent','')[:220]
+    return ip,ua
+App.client_key=_c003_client_key
+
+_c003_send_common_base=App.send_common
+def _c003_send_common(self):
+    _c003_send_common_base(self)
+    self.send_header('X-Frame-Options','DENY')
+    self.send_header('Cross-Origin-Opener-Policy','same-origin')
+    self.send_header('Cross-Origin-Resource-Policy','same-origin')
+    self.send_header('Content-Security-Policy',"default-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+    if _PRODUCTION and SECURE:self.send_header('Strict-Transport-Security','max-age=31536000; includeSubDomains')
+App.send_common=_c003_send_common
+
+def _c003_session(self):
+    cookie=SimpleCookie();cookie.load(self.headers.get('Cookie',''));item=cookie.get('egm_session')
+    if not item:return None
+    hashed=_session_token_hash(item.value);con=db();r=con.execute('SELECT s.token,s.csrf,s.expires_at,u.* FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?',(hashed,)).fetchone();con.close();d=rowdict(r)
+    return d if d and d['expires_at']>now() and d['status']=='active' else None
+App.session=_c003_session
+
+_c003_get_base=App.do_GET
+def _c003_do_GET(self):
+    path=urlparse(self.path).path
+    if path=='/api/health/ready':
+        current=_production_readiness(os.environ)
+        public={'schema':current['schema'],'production':current['production'],'ready':current['ready'],'missing':current['missing']}
+        return self.json(public,200 if current['ready'] else 503)
+    if path=='/api/admin/production-readiness':
+        s=self.need(owner=True)
+        if not s:return
+        current=_production_readiness(os.environ)
+        return self.json(current,200 if current['ready'] else 503)
+    return _c003_get_base(self)
+App.do_GET=_c003_do_GET
+
+_c003_post_base=App.do_POST
+def _c003_do_POST(self):
+    path=urlparse(self.path).path
+    if path=='/api/login':
+        b=self.body();ip,_=self.client_key()
+        if not rate(LOGIN_BUCKET,ip,12,900):return self.json({'error':'rate_limited'},429)
+        con=db();u=con.execute('SELECT * FROM users WHERE username=?',(clean(b.get('username'),60),)).fetchone();d=rowdict(u)
+        if not d or d['status']!='active' or not verify(str(b.get('password','')),d['password_hash'],d['salt']):con.close();return self.json({'error':'invalid_credentials'},401)
+        if d.get('role')=='owner' and _totp_secret() and not _verify_totp(_totp_secret(),b.get('totp')):
+            con.close();return self.json({'error':'mfa_required','method':'TOTP'},401)
+        raw=secrets.token_urlsafe(32);stored=_session_token_hash(raw);csrf=secrets.token_urlsafe(24);exp=(datetime.now(timezone.utc)+timedelta(hours=12)).replace(microsecond=0).isoformat();con.execute('INSERT INTO auth_sessions(token,user_id,csrf,created_at,expires_at) VALUES(?,?,?,?,?)',(stored,d['id'],csrf,now(),exp));audit(con,d['id'],'login_mfa_verified' if d.get('role')=='owner' and _totp_secret() else 'login','user',d['id'],{'session_token_at_rest':'sha256'});con.commit();con.close();cookie=f'egm_session={raw}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200'+('; Secure' if SECURE else '');return self.json({'ok':True,'mfa':bool(d.get('role')=='owner' and _totp_secret())},cookies=[cookie])
+    if path=='/api/logout':
+        cookie=SimpleCookie();cookie.load(self.headers.get('Cookie',''));item=cookie.get('egm_session')
+        if item:
+            con=db();con.execute('DELETE FROM auth_sessions WHERE token=?',(_session_token_hash(item.value),));con.commit();con.close()
+        return self.json({'ok':True},cookies=['egm_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax'+('; Secure' if SECURE else '')])
+    return _c003_post_base(self)
+App.do_POST=_c003_do_POST
