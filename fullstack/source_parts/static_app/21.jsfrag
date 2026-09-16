@@ -1,0 +1,25 @@
+// C016 multi-session coaching trends in My Evidence Lab and owner analytics.
+function c016TrendRows(groups){
+  if(!groups||!groups.length)return '<p class="muted">Complete at least three comparable coaching experiments to establish a multi-session pattern.</p>';
+  return groups.map(g=>`<div class="event"><div class="topline"><b>${esc(g.platform)} · ${esc(g.metricLabel)}</b><span class="pill ${g.classification==='improving_pattern'?'good':g.classification==='worsening_pattern'?'warn':''}">${esc(g.classificationLabel)}</span></div><p class="muted">${esc(g.completedComparisons)} completed comparisons · confidence ${(Number(g.confidence||0)*100).toFixed(0)}% · evidence balance ${Number(g.evidenceBalance||0).toFixed(2)}</p><p>${esc(g.uncertainty)}</p></div>`).join('')
+}
+
+const _c016ReturnLabBase=returnLab;
+returnLab=async function(){
+  await _c016ReturnLabBase();
+  if(!S.me)return;
+  try{
+    const t=await api('/api/coaching/trends'),grid=document.querySelector('.content .grid');
+    if(grid)grid.insertAdjacentHTML('afterbegin',`<div class="card span12"><div class="tag">C016 · Multi-session coaching trends</div><h2>Repeated evidence, not a lucky streak wearing a lab coat</h2><p class="muted">${esc(t.boundary)}</p>${c016TrendRows(t.groups)}</div>`)
+  }catch(e){console.warn('C016 trends unavailable',e)}
+};
+
+const _c016AdminBase=admin;
+admin=async function(){
+  await _c016AdminBase();
+  if(!S.me||S.me.role!=='owner')return;
+  try{
+    const t=await api('/api/admin/coaching-trend-overview'),grid=document.querySelector('.content .grid');
+    if(grid)grid.insertAdjacentHTML('beforeend',`<div class="card span12"><div class="tag">C016 · Coaching trend overview</div><h2>Real-user multi-session evidence</h2><p class="muted">${esc(t.boundary)}</p><p><span class="pill">${esc(t.measuredRealUsers)} measured real users</span> <span class="pill">${esc(t.completedComparisons)} completed comparisons</span></p>${c016TrendRows(t.groups)}</div>`)
+  }catch(e){console.warn('C016 owner trends unavailable',e)}
+};
