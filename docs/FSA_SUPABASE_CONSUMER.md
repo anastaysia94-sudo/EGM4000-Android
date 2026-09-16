@@ -1,6 +1,6 @@
 # F.S.A. Supabase -> EGM4000 consumer
 
-Status: live database migration applied; this repository migration is the canonical source for the consumer boundary.
+Status: live database importer and database-internal scheduler applied; repository migrations are the canonical source for the consumer boundary.
 
 ## Why this exists
 
@@ -33,6 +33,24 @@ The RPC is `SECURITY DEFINER`, so its execute grants are intentionally narrow:
 
 Never place a service-role credential in the web/PWA or Android app. Invoke this RPC only from a trusted server, protected automation, or an administrative backend.
 
+## Automatic scheduler
+
+`20260916_egm_fsa_consumer_scheduler_v1.sql` enables `pg_cron` and registers the named job:
+
+`egm-fsa-telemetry-import-v1`
+
+The job runs once per minute as the database `postgres` role and executes:
+
+```sql
+select public.egm_rpc_import_fsa_telemetry(1000);
+```
+
+This keeps the automatic path entirely inside Postgres. It stores no service-role key, API key, bearer token, or client credential. The `cron` schema is not granted to `anon`, `authenticated`, or `service_role`, so ordinary API roles cannot manage the job.
+
+The job name is stable. Reapplying the scheduler migration replaces the same named schedule rather than creating a growing stack of duplicate jobs.
+
+To disable the automatic import without deleting the importer, unschedule the named job through a privileged database administration path. Do not expose cron-management privileges to application clients.
+
 ## Identity rule
 
 The bridge is intentionally conservative:
@@ -61,19 +79,19 @@ Other F.S.A. telemetry event names are preserved so EGM4000 does not pretend two
 
 ## Current live verification
 
-At implementation time the live F.S.A. telemetry tables contained no events, so production verification was deliberately limited to the empty path. The live RPC returned:
+At implementation time the live F.S.A. telemetry tables contained no events, so production data-path verification was deliberately limited to the empty path. The live RPC returned:
 
 - `imported: 0`
 - `remainingLinked: 0`
 - `pendingUnlinked: 0`
 
-Permission checks also confirmed that anonymous and ordinary authenticated roles cannot execute the function while `service_role` can.
+Permission checks confirmed that anonymous and ordinary authenticated roles cannot execute the importer while `service_role` can. Scheduler checks confirmed the cron job is active as `postgres` and the `cron` schema is inaccessible to `anon`, `authenticated`, and `service_role`.
 
 No synthetic telemetry was inserted into the live project merely to make a test look exciting.
 
 ## Operational call
 
-From a trusted server using the Supabase service role:
+The cron job is the normal automatic path. A trusted server may also run an on-demand catch-up using the Supabase service role:
 
 ```js
 const { data, error } = await supabase.rpc('egm_rpc_import_fsa_telemetry', {
@@ -92,4 +110,5 @@ Once the first real linked F.S.A. player emits telemetry, verify all of the foll
 - a retry imports zero duplicates;
 - the normalized payload contains `fsaPlayerKey` but not the raw F.S.A. player UUID;
 - events for an unlinked player remain unimported and increase `pendingUnlinked`;
+- the scheduled job continues succeeding under real event volume;
 - analysis consuming the normalized event preserves the `exact_telemetry` evidence label and does not turn telemetry into outcome guarantees.
