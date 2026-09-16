@@ -1,0 +1,88 @@
+
+# C008 A076: entitlement-gated historical evidence export/report add-on.
+from export_addon import admin_export_status,generate_artifact,get_artifact,grant_entitlement,migrate_export_addon,revoke_entitlement,user_export_status
+
+_c008e=db()
+try:migrate_export_addon(_c008e)
+finally:_c008e.close()
+
+_C008_EXPORT_ENTITLEMENT_FIELDS={'action','user_id','source','note'}
+_C008_EXPORT_GENERATE_FIELDS={'format'}
+
+def _c008_export_error(self,exc):
+    code=str(exc)
+    if code in ('export_artifact_not_found','entitlement_user_not_found','entitlement_not_found'):
+        status=404
+    elif code=='export_addon_entitlement_required':
+        status=403
+    else:
+        status=400
+    return self.json({'error':code},status)
+
+_c008e_get_base=App.do_GET
+def _c008e_do_GET(self):
+    path=urlparse(self.path).path
+    if path=='/api/export-addon/status':
+        s=self.need()
+        if not s:return
+        con=db()
+        try:payload=user_export_status(con,s['id'])
+        finally:con.close()
+        return self.json(payload)
+    if path.startswith('/api/export-addon/artifact/'):
+        s=self.need()
+        if not s:return
+        artifact_id=path.rsplit('/',1)[-1]
+        con=db()
+        try:payload={'schema':'egm.a076.export-artifact.v1','artifact':get_artifact(con,s['id'],artifact_id)}
+        except ValueError as exc:
+            con.close();return _c008_export_error(self,exc)
+        con.close();return self.json(payload)
+    if path=='/api/admin/export-addon':
+        s=self.need(owner=True)
+        if not s:return
+        con=db()
+        try:payload=admin_export_status(con)
+        finally:con.close()
+        return self.json(payload)
+    return _c008e_get_base(self)
+App.do_GET=_c008e_do_GET
+
+_c008e_post_base=App.do_POST
+def _c008e_do_POST(self):
+    path=urlparse(self.path).path
+    if path=='/api/export-addon/generate':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        unknown=set(b)-_C008_EXPORT_GENERATE_FIELDS
+        if unknown:return self.json({'error':'unsupported_export_generate_fields','fields':sorted(str(x) for x in unknown)},400)
+        con=db()
+        try:
+            artifact=generate_artifact(con,s['id'],b.get('format'))
+            audit(con,s['id'],'export_addon_artifact_generated','export_artifact',artifact['id'],{'format':artifact['format'],'row_count':artifact['rowCount'],'sha256':artifact['sha256']});con.commit()
+        except ValueError as exc:
+            con.rollback();con.close();return _c008_export_error(self,exc)
+        con.close();return self.json({'ok':True,'artifact':artifact},201)
+    if path=='/api/admin/export-addon-entitlement':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        unknown=set(b)-_C008_EXPORT_ENTITLEMENT_FIELDS
+        if unknown:return self.json({'error':'unsupported_export_entitlement_fields','fields':sorted(str(x) for x in unknown)},400)
+        action=clean(b.get('action') or 'grant',30)
+        try:user_id=int(b.get('user_id'))
+        except Exception:return self.json({'error':'valid_user_id_required'},400)
+        con=db()
+        try:
+            if action=='grant':
+                entitlement=grant_entitlement(con,user_id,b.get('source'),b.get('note'),s['id'])
+                audit(con,s['id'],'export_addon_entitlement_granted','user',str(user_id),{'feature_id':'A076','source':entitlement['source'],'payment_verified':False});con.commit()
+            elif action=='revoke':
+                entitlement=revoke_entitlement(con,user_id,b.get('note'),s['id'])
+                audit(con,s['id'],'export_addon_entitlement_revoked','user',str(user_id),{'feature_id':'A076'});con.commit()
+            else:
+                con.close();return self.json({'error':'unsupported_export_entitlement_action'},400)
+        except ValueError as exc:
+            con.rollback();con.close();return _c008_export_error(self,exc)
+        con.close();return self.json({'ok':True,'entitlement':entitlement})
+    return _c008e_post_base(self)
+App.do_POST=_c008e_do_POST
