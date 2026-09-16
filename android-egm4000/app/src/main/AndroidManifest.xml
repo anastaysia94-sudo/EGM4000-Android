@@ -7,7 +7,7 @@
     <application
         android:theme="@style/AppTheme"
         android:label="EGM4000"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:usesCleartextTraffic="false">
         <activity
             android:name=".TutorialActivity"
@@ -17,12 +17,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".ServerSetupActivity"
-            android:exported="false" />
-        <activity
-            android:name=".MainActivity"
-            android:exported="false" />
+        <activity android:name=".ServerSetupActivity" android:exported="false" />
+        <activity android:name=".MainActivity" android:exported="false" />
         <service
             android:name=".ScreenFeedbackService"
             android:exported="false"
