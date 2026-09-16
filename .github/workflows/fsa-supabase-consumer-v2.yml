@@ -4,12 +4,14 @@ on:
   pull_request:
     paths:
       - "supabase/migrations/20260916_egm_fsa_supabase_consumer_v2.sql"
+      - "supabase/migrations/20260916_egm_fsa_supabase_consumer_v2_perf.sql"
       - "tests/fsa-supabase-consumer-v2-smoke.sql"
       - ".github/workflows/fsa-supabase-consumer-v2.yml"
   push:
     branches: [ main ]
     paths:
       - "supabase/migrations/20260916_egm_fsa_supabase_consumer_v2.sql"
+      - "supabase/migrations/20260916_egm_fsa_supabase_consumer_v2_perf.sql"
       - "tests/fsa-supabase-consumer-v2-smoke.sql"
       - ".github/workflows/fsa-supabase-consumer-v2.yml"
   workflow_dispatch:
@@ -139,8 +141,10 @@ jobs:
           );
           SQL
 
-      - name: Apply canonical consumer migration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260916_egm_fsa_supabase_consumer_v2.sql
+      - name: Apply canonical consumer migrations
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260916_egm_fsa_supabase_consumer_v2.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260916_egm_fsa_supabase_consumer_v2_perf.sql
 
       - name: Run end-to-end bridge smoke
         run: psql -v ON_ERROR_STOP=1 -f tests/fsa-supabase-consumer-v2-smoke.sql
