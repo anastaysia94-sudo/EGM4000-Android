@@ -1,0 +1,33 @@
+
+# C008 A095 signed reconciliation bridge for A082 marketplace + A083 white-label.
+from billing_commerce_bridge import ingest_signed_commerce_event,save_commerce_customer_link
+
+_c008commerce_post_base=App.do_POST
+def _c008commerce_do_POST(self):
+    path=urlparse(self.path).path
+    if path=='/api/billing/commerce-provider-event':
+        secret=os.environ.get('EGM_BILLING_WEBHOOK_SECRET','')
+        if not secret:return self.json({'error':'billing_provider_not_configured'},503)
+        ip,_ua=self.client_key()
+        if not rate(WRITE_BUCKET,'billing-commerce-provider:'+ip,120,60):return self.json({'error':'rate_limited'},429)
+        try:
+            length=int(self.headers.get('Content-Length','0') or 0)
+            if length<2 or length>100000:return self.json({'error':'invalid_billing_event_size'},400)
+            raw=self.rfile.read(length);signature=self.headers.get('X-EGM-Billing-Signature','')
+            con=db()
+            try:result=ingest_signed_commerce_event(con,raw,signature,secret)
+            finally:con.close()
+            return self.json({'ok':True,'result':result})
+        except PermissionError as exc:return self.json({'error':str(exc)},403)
+        except (ValueError,TypeError) as exc:return self.json({'error':str(exc)},400)
+    if path=='/api/admin/billing-commerce-link':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        con=db()
+        try:
+            lid=save_commerce_customer_link(con,b.get('provider'),b.get('customer_ref'),int(b.get('user_id') or 0),b.get('target_type'),b.get('target_id'))
+            audit(con,s['id'],'billing_commerce_customer_link_saved','billing_customer_link',lid,{'provider':clean(b.get('provider'),40),'user_id':int(b.get('user_id') or 0),'target_type':clean(b.get('target_type'),30),'target_id':clean(b.get('target_id'),100)});con.commit()
+        except (ValueError,TypeError) as exc:con.rollback();con.close();return _c008_bill_error(self,exc)
+        con.close();return self.json({'ok':True,'linkId':lid})
+    return _c008commerce_post_base(self)
+App.do_POST=_c008commerce_do_POST
