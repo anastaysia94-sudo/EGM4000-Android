@@ -1,0 +1,53 @@
+name: EGM4000 C015 Release Signing Smoke
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "android-egm4000/**"
+      - ".github/workflows/c015-release-signing-smoke.yml"
+  pull_request:
+    paths:
+      - "android-egm4000/**"
+      - ".github/workflows/c015-release-signing-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  release-signing-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+      - name: Create disposable CI-only signing identity
+        shell: bash
+        run: |
+          keytool -genkeypair -noprompt \
+            -keystore "$RUNNER_TEMP/egm4000-ci-qa.jks" \
+            -storepass ci-only-password \
+            -keypass ci-only-password \
+            -alias egm4000-ci-qa \
+            -keyalg RSA -keysize 2048 -validity 2 \
+            -dname "CN=EGM4000 CI QA,O=SmartPickShop Holdings,C=US"
+      - name: Build signed release-shaped QA artifacts
+        working-directory: android-egm4000
+        run: |
+          gradle :app:assembleRelease :app:bundleRelease \
+            -PEGM_SIGNING_STORE_FILE="$RUNNER_TEMP/egm4000-ci-qa.jks" \
+            -PEGM_SIGNING_STORE_PASSWORD=ci-only-password \
+            -PEGM_SIGNING_KEY_ALIAS=egm4000-ci-qa \
+            -PEGM_SIGNING_KEY_PASSWORD=ci-only-password \
+            --stacktrace
+      - name: Verify signatures and package identity
+        shell: bash
+        run: |
+          apksigner verify --verbose android-egm4000/app/build/outputs/apk/release/app-release.apk
+          jarsigner -verify -strict android-egm4000/app/build/outputs/bundle/release/app-release.aab
+          aapt dump badging android-egm4000/app/build/outputs/apk/release/app-release.apk | grep "package: name='com.smartpickshop.egm4000'"
+          echo 'C015 release signing plumbing verified with a disposable CI-only key; this is not the production signing identity.'
