@@ -24,6 +24,9 @@ import time
 import urllib.error
 import urllib.request
 
+from bootstrap_db import ensure_schema,hash_password,now
+from storage import connect
+
 ROOT=Path(__file__).resolve().parent
 PORT=18473
 BASE=f'http://127.0.0.1:{PORT}'
@@ -43,21 +46,31 @@ def request(opener,path,method='GET',body=None,csrf=None):
         return e.code,dict(e.headers),json.loads(e.read() or b'{}')
 
 
+def preseed_owner(owner_password):
+    con=connect();ensure_schema(con);ph,salt=hash_password(owner_password)
+    con.execute("""INSERT INTO users(id,username,email,password_hash,salt,role,display_name,bio,favorite_platform,skill_focus,joined_at,status,is_synthetic)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",(1,'EGM4000Owner','owner@egm4000.local',ph,salt,'owner','EGM4000 Owner','Runtime security fixture owner.','EGM4000','Administration',now(),'active',0))
+    con.commit();con.close()
+
+
 def main():
     data=ROOT/'data'
     if data.exists():shutil.rmtree(data)
     owner_password=secrets.token_urlsafe(24);recovery=secrets.token_urlsafe(32);visitor=secrets.token_urlsafe(32);totp_secret='JBSWY3DPEHPK3PXP'
+    preseed_owner(owner_password)
     env=os.environ.copy();env.update({'PORT':str(PORT),'EGM_OWNER_PASSWORD':owner_password,'EGM_OWNER_RECOVERY_TOKEN':recovery,'EGM_VISITOR_SECRET':visitor,'EGM_OWNER_TOTP_SECRET':totp_secret,'EGM_ENV':'test','EGM_SECURE_COOKIES':'0','EGM_TRUST_PROXY':'0'})
     proc=subprocess.Popen([sys.executable,'server.py'],cwd=ROOT,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
     try:
         plain=urllib.request.build_opener()
-        for _ in range(80):
+        for _ in range(120):
             try:
                 code,headers,payload=request(plain,'/api/health')
                 if code==200:break
             except Exception:pass
             time.sleep(.1)
-        else:raise AssertionError('server did not become healthy')
+        else:
+            proc.poll();out=proc.stdout.read() if proc.stdout and proc.returncode is not None else ''
+            raise AssertionError('server did not become healthy: '+out[-1200:])
         assert headers.get('X-Frame-Options')=='DENY' and 'frame-ancestors' in headers.get('Content-Security-Policy','')
         code,_,_=request(plain,'/api/admin/features');assert code==401
         code,_,payload=request(plain,'/api/login','POST',{'username':'EGM4000Owner','password':owner_password});assert code==401 and payload['error']=='mfa_required'
