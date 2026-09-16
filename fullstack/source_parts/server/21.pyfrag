@@ -1,0 +1,146 @@
+
+# C008 A072/A086/A088/A094/A095 billing and lifecycle controls.
+from billing_controls import A072,A086,A088,addon_status,billing_controls_status,consume_coaching,coupons_admin,create_retention_archive,get_retention_archive,grant_addon,ingest_signed_provider_event,migrate_billing_controls,prune_expired_archives,reconciliation_summary,redeem_coupon,retention_insights,revoke_addon,save_coupon,save_customer_link
+
+_c008bill=db()
+try:migrate_billing_controls(_c008bill)
+finally:_c008bill.close()
+
+_C008_ADDON_FIELDS={'action','user_id','feature_id','source','limit_value','retain_days','note','ends_at'}
+_C008_COUPON_FIELDS={'code','title','kind','target_plan_id','target_feature_id','trial_days','unit_bonus','retention_days','discount_label','max_redemptions','active','starts_at','ends_at'}
+
+def _c008_bill_error(self,exc):
+    code=str(exc)
+    if isinstance(exc,PermissionError):status=403
+    elif code in {'addon_user_not_found','addon_access_not_found','retention_archive_not_found','billing_plan_not_found','billing_user_not_found'}:status=404
+    elif code in {'coupon_already_redeemed','coupon_redemption_limit_reached'}:status=409
+    else:status=400
+    return self.json({'error':code},status)
+
+_c008bill_get_base=App.do_GET
+def _c008bill_do_GET(self):
+    p=urlparse(self.path);path=p.path;q=parse_qs(p.query)
+    if path=='/api/billing/status':
+        s=self.need()
+        if not s:return
+        con=db()
+        try:payload=billing_controls_status(con,s['id'])
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/commercial/retention-insights':
+        s=self.need()
+        if not s:return
+        con=db()
+        try:payload=retention_insights(con,s['id'])
+        except (PermissionError,ValueError) as exc:con.close();return _c008_bill_error(self,exc)
+        con.close();return self.json(payload)
+    if path=='/api/retention-archive':
+        s=self.need()
+        if not s:return
+        con=db()
+        try:payload=get_retention_archive(con,s['id'],qval(q,'id'))
+        except ValueError as exc:con.close();return _c008_bill_error(self,exc)
+        con.close();return self.json(payload)
+    if path=='/api/admin/billing-controls':
+        s=self.need(owner=True)
+        if not s:return
+        con=db()
+        try:
+            access=con.execute("""SELECT a.*,u.username,u.display_name FROM billing_addon_access a JOIN users u ON u.id=a.user_id ORDER BY a.updated_at DESC""").fetchall()
+            payload={'schema':'egm.admin.billing-controls.v1','addonAccess':rowsdict(access),'coupons':coupons_admin(con),'reconciliation':reconciliation_summary(con),'boundary':'Manual owner grants cannot create provider_verified state; that state only comes from a signature-verified provider event.'}
+        finally:con.close()
+        return self.json(payload)
+    return _c008bill_get_base(self)
+App.do_GET=_c008bill_do_GET
+
+_c008bill_post_base=App.do_POST
+def _c008bill_do_POST(self):
+    path=urlparse(self.path).path
+    if path=='/api/billing/provider-event':
+        secret=os.environ.get('EGM_BILLING_WEBHOOK_SECRET','')
+        if not secret:return self.json({'error':'billing_provider_not_configured'},503)
+        ip,_ua=self.client_key()
+        if not rate(WRITE_BUCKET,'billing-provider:'+ip,120,60):return self.json({'error':'rate_limited'},429)
+        try:
+            length=int(self.headers.get('Content-Length','0') or 0)
+            if length<2 or length>100000:return self.json({'error':'invalid_billing_event_size'},400)
+            raw=self.rfile.read(length)
+            signature=self.headers.get('X-EGM-Billing-Signature','')
+            con=db()
+            try:result=ingest_signed_provider_event(con,raw,signature,secret)
+            finally:con.close()
+            return self.json({'ok':True,'result':result},200)
+        except PermissionError as exc:return self.json({'error':str(exc)},403)
+        except (ValueError,TypeError) as exc:return self.json({'error':str(exc)},400)
+    if path=='/api/usage-coaching':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        con=db()
+        try:
+            payload=consume_coaching(con,s['id'],b.get('context',''))
+            audit(con,s['id'],'usage_coaching_consumed','billing_addon',A072,{'usage_event_id':payload['usageEventId'],'remaining_units':payload['status']['remainingUnits']});con.commit()
+        except (PermissionError,ValueError) as exc:con.rollback();con.close();return _c008_bill_error(self,exc)
+        con.close();return self.json(payload)
+    if path=='/api/retention-archive':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        con=db()
+        try:
+            artifact=create_retention_archive(con,s['id'])
+            audit(con,s['id'],'retention_archive_created','retention_archive',artifact['id'],{'expires_at':artifact['expiresAt'],'row_count':artifact['rowCount']});con.commit()
+        except (PermissionError,ValueError) as exc:con.rollback();con.close();return _c008_bill_error(self,exc)
+        con.close();return self.json({'ok':True,'archive':artifact},201)
+    if path=='/api/coupon/redeem':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        con=db()
+        try:
+            result=redeem_coupon(con,s['id'],b.get('code'))
+            audit(con,s['id'],'commercial_coupon_redeemed','commercial_coupon',clean(b.get('code'),40).upper(),{'kind':result['kind'],'status':result['status']});con.commit()
+        except (PermissionError,ValueError) as exc:con.rollback();con.close();return _c008_bill_error(self,exc)
+        con.close();return self.json({'ok':True,'redemption':result})
+    if path=='/api/admin/addon-access':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        unknown=set(b)-_C008_ADDON_FIELDS
+        if unknown:return self.json({'error':'unsupported_addon_access_fields','fields':sorted(str(x) for x in unknown)},400)
+        action=clean(b.get('action') or 'grant',20).lower();feature=clean(b.get('feature_id'),20);user_id=int(b.get('user_id') or 0);con=db()
+        try:
+            if action=='grant':
+                source=clean(b.get('source') or 'complimentary',40)
+                if source=='provider_verified':raise ValueError('billing_provider_confirmation_not_available')
+                access=grant_addon(con,user_id,feature,source,b.get('limit_value'),b.get('retain_days'),b.get('note',''),b.get('ends_at'))
+                audit(con,s['id'],'billing_addon_granted','billing_addon',feature,{'user_id':user_id,'source':source});con.commit();result={'ok':True,'access':access}
+            elif action=='revoke':
+                revoke_addon(con,user_id,feature,b.get('note',''));audit(con,s['id'],'billing_addon_revoked','billing_addon',feature,{'user_id':user_id});con.commit();result={'ok':True}
+            else:raise ValueError('invalid_addon_access_action')
+        except (ValueError,TypeError) as exc:con.rollback();con.close();return _c008_bill_error(self,exc)
+        con.close();return self.json(result)
+    if path=='/api/admin/coupon':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        unknown=set(b)-_C008_COUPON_FIELDS
+        if unknown:return self.json({'error':'unsupported_coupon_fields','fields':sorted(str(x) for x in unknown)},400)
+        con=db()
+        try:
+            code=save_coupon(con,b);audit(con,s['id'],'commercial_coupon_saved','commercial_coupon',code,{'kind':clean(b.get('kind'),30),'active':bool(b.get('active',True))});con.commit()
+        except ValueError as exc:con.rollback();con.close();return _c008_bill_error(self,exc)
+        con.close();return self.json({'ok':True,'code':code})
+    if path=='/api/admin/billing-link':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        con=db()
+        try:
+            lid=save_customer_link(con,b.get('provider'),b.get('customer_ref'),int(b.get('user_id') or 0),b.get('target_type'),b.get('target_id'))
+            audit(con,s['id'],'billing_customer_link_saved','billing_customer_link',lid,{'provider':clean(b.get('provider'),40),'user_id':int(b.get('user_id') or 0),'target_type':clean(b.get('target_type'),20),'target_id':clean(b.get('target_id'),80)});con.commit()
+        except (ValueError,TypeError) as exc:con.rollback();con.close();return _c008_bill_error(self,exc)
+        con.close();return self.json({'ok':True,'linkId':lid})
+    if path=='/api/admin/retention-prune':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        con=db()
+        try:count=prune_expired_archives(con);audit(con,s['id'],'retention_archives_pruned','retention_archive','',{'deleted':count});con.commit()
+        finally:con.close()
+        return self.json({'ok':True,'deleted':count})
+    return _c008bill_post_base(self)
+App.do_POST=_c008bill_do_POST
