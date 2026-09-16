@@ -56,6 +56,7 @@ def preseed_owner(owner_password):
 def main():
     data=ROOT/'data'
     if data.exists():shutil.rmtree(data)
+    data.mkdir(parents=True,exist_ok=True)
     owner_password=secrets.token_urlsafe(24);recovery=secrets.token_urlsafe(32);visitor=secrets.token_urlsafe(32);totp_secret='JBSWY3DPEHPK3PXP'
     preseed_owner(owner_password)
     env=os.environ.copy();env.update({'PORT':str(PORT),'EGM_OWNER_PASSWORD':owner_password,'EGM_OWNER_RECOVERY_TOKEN':recovery,'EGM_VISITOR_SECRET':visitor,'EGM_OWNER_TOTP_SECRET':totp_secret,'EGM_ENV':'test','EGM_SECURE_COOKIES':'0','EGM_TRUST_PROXY':'0'})
