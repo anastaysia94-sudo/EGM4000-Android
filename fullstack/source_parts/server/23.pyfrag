@@ -1,0 +1,47 @@
+
+# C008 A084 scoped aggregate developer API. Provision/rotate keys via api_access_admin.py.
+from commercial_access import admin_api_clients,api_evidence_summary,api_platform_summary,authorize_api_client,migrate_commercial_access,record_api_usage
+
+_c008api=db()
+try:migrate_commercial_access(_c008api)
+finally:_c008api.close()
+
+def _c008_api_authorize(self,scope,endpoint):
+    raw=self.headers.get('X-EGM-API-Key','').strip()
+    if not raw:
+        self.json({'error':'api_key_required'},401);return None
+    con=db()
+    try:
+        row,used,quota=authorize_api_client(con,raw,scope)
+        record_api_usage(con,row,scope,endpoint)
+        return con,row,used+1,quota
+    except ValueError as exc:
+        con.close();code=str(exc);status=429 if code=='api_daily_quota_exceeded' else (403 if code=='api_scope_denied' else 401);self.json({'error':code},status);return None
+
+_c008api_get_base=App.do_GET
+def _c008api_do_GET(self):
+    path=urlparse(self.path).path
+    if path=='/api/developer/platform-summary':
+        auth=_c008_api_authorize(self,'summary',path)
+        if not auth:return
+        con,row,used,quota=auth
+        try:payload=api_platform_summary(con);payload['usage']={'usedToday':used,'dailyQuota':quota,'remainingToday':max(0,quota-used)}
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/developer/evidence-summary':
+        auth=_c008_api_authorize(self,'evidence',path)
+        if not auth:return
+        con,row,used,quota=auth
+        try:payload=api_evidence_summary(con);payload['usage']={'usedToday':used,'dailyQuota':quota,'remainingToday':max(0,quota-used)}
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/admin/api-access':
+        s=self.need(owner=True)
+        if not s:return
+        con=db()
+        try:payload=admin_api_clients(con)
+        finally:con.close()
+        payload['provisioning']='Create, rotate, and archive API clients only from an authorized deployment shell with fullstack/api_access_admin.py. Raw keys are never returned by this browser endpoint.'
+        return self.json(payload)
+    return _c008api_get_base(self)
+App.do_GET=_c008api_do_GET
