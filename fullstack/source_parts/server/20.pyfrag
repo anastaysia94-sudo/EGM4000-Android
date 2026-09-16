@@ -1,0 +1,169 @@
+
+# C008 A071/A073/A074/A075/A078/A085/A089 commercial plan/workspace suite.
+from commercial_suite import admin_commercial_snapshot,advanced_analytics,create_premium_post,create_workspace,founder_analytics,grant_subscription,migrate_commercial_suite,my_commercial_status,my_workspaces,premium_posts,public_plans,request_plan,research_notes,revoke_subscription,save_plan,save_research_note,add_workspace_member,resolve_plan_request
+
+_c008suite=db()
+try:migrate_commercial_suite(_c008suite)
+finally:_c008suite.close()
+
+_C008_PLAN_FIELDS={'id','title','description','price_label','features','seat_limit','status'}
+_C008_SUB_FIELDS={'action','user_id','plan_id','source','note','ends_at','subscription_id'}
+
+def _c008_suite_error(self,exc):
+    code=str(exc)
+    if isinstance(exc,PermissionError):status=403
+    elif code in {'plan_not_available','subscription_plan_not_available','subscription_user_not_found','subscription_not_found','plan_request_not_found','workspace_not_found','workspace_member_not_found'}:status=404
+    elif code in {'plan_request_already_pending','workspace_seat_limit_reached'}:status=409
+    else:status=400
+    return self.json({'error':code},status)
+
+_c008suite_get_base=App.do_GET
+def _c008suite_do_GET(self):
+    path=urlparse(self.path).path
+    if path=='/api/commercial/plans':
+        con=db()
+        try:payload=public_plans(con)
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/commercial/status':
+        s=self.need()
+        if not s:return
+        con=db()
+        try:payload=my_commercial_status(con,s['id'])
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/commercial/advanced-analytics':
+        s=self.need()
+        if not s:return
+        con=db()
+        try:payload=advanced_analytics(con,s['id'])
+        except (PermissionError,ValueError) as exc:con.close();return _c008_suite_error(self,exc)
+        con.close();return self.json(payload)
+    if path=='/api/commercial/research':
+        s=self.need()
+        if not s:return
+        con=db()
+        try:payload=research_notes(con,s['id'])
+        except (PermissionError,ValueError) as exc:con.close();return _c008_suite_error(self,exc)
+        con.close();return self.json(payload)
+    if path=='/api/commercial/premium-community':
+        s=self.need()
+        if not s:return
+        con=db()
+        try:payload=premium_posts(con,s['id'])
+        except (PermissionError,ValueError) as exc:con.close();return _c008_suite_error(self,exc)
+        con.close();return self.json(payload)
+    if path=='/api/commercial/workspaces':
+        s=self.need()
+        if not s:return
+        con=db()
+        try:payload=my_workspaces(con,s['id'])
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/commercial/founder-analytics':
+        s=self.need(owner=True)
+        if not s:return
+        con=db()
+        try:payload=founder_analytics(con,s['id'])
+        except (PermissionError,ValueError) as exc:con.close();return _c008_suite_error(self,exc)
+        con.close();return self.json(payload)
+    if path=='/api/admin/commercial-suite':
+        s=self.need(owner=True)
+        if not s:return
+        con=db()
+        try:payload=admin_commercial_snapshot(con)
+        finally:con.close()
+        return self.json(payload)
+    return _c008suite_get_base(self)
+App.do_GET=_c008suite_do_GET
+
+_c008suite_post_base=App.do_POST
+def _c008suite_do_POST(self):
+    path=urlparse(self.path).path
+    if path=='/api/commercial/plan-request':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        con=db()
+        try:
+            rid=request_plan(con,s['id'],b.get('plan_id'),b.get('note',''))
+            audit(con,s['id'],'commercial_plan_requested','commercial_plan_request',rid,{'plan_id':clean(b.get('plan_id'),80)});con.commit()
+        except ValueError as exc:con.rollback();con.close();return _c008_suite_error(self,exc)
+        con.close();return self.json({'ok':True,'requestId':rid},201)
+    if path=='/api/commercial/research-note':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        con=db()
+        try:
+            nid=save_research_note(con,s['id'],b)
+            audit(con,s['id'],'commercial_research_note_saved','commercial_research_note',nid,{'evidence_label':clean(b.get('evidence_label'),40)});con.commit()
+        except (PermissionError,ValueError) as exc:con.rollback();con.close();return _c008_suite_error(self,exc)
+        con.close();return self.json({'ok':True,'noteId':nid})
+    if path=='/api/commercial/premium-post':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        con=db()
+        try:
+            pid=create_premium_post(con,s['id'],b)
+            audit(con,s['id'],'premium_community_posted','commercial_premium_post',pid,{});con.commit()
+        except (PermissionError,ValueError) as exc:con.rollback();con.close();return _c008_suite_error(self,exc)
+        con.close();return self.json({'ok':True,'postId':pid},201)
+    if path=='/api/commercial/workspace':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        con=db()
+        try:
+            wid=create_workspace(con,s['id'],b.get('name'),b.get('kind','team'))
+            audit(con,s['id'],'commercial_workspace_created','commercial_workspace',wid,{'kind':clean(b.get('kind') or 'team',20)});con.commit()
+        except (PermissionError,ValueError) as exc:con.rollback();con.close();return _c008_suite_error(self,exc)
+        con.close();return self.json({'ok':True,'workspaceId':wid},201)
+    if path=='/api/commercial/workspace-member':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        con=db()
+        try:
+            member_id=int(b.get('user_id') or 0)
+            add_workspace_member(con,s['id'],b.get('workspace_id'),member_id,b.get('role','member'))
+            audit(con,s['id'],'commercial_workspace_member_saved','commercial_workspace',clean(b.get('workspace_id'),80),{'member_user_id':member_id,'role':clean(b.get('role') or 'member',20)});con.commit()
+        except (PermissionError,ValueError,TypeError) as exc:con.rollback();con.close();return _c008_suite_error(self,exc)
+        con.close();return self.json({'ok':True})
+    if path=='/api/admin/commercial-plan':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        unknown=set(b)-_C008_PLAN_FIELDS
+        if unknown:return self.json({'error':'unsupported_commercial_plan_fields','fields':sorted(str(x) for x in unknown)},400)
+        con=db()
+        try:
+            plan=save_plan(con,b)
+            audit(con,s['id'],'commercial_plan_saved','commercial_plan',plan['id'],{'status':plan['status'],'features':plan['features']});con.commit()
+        except ValueError as exc:con.rollback();con.close();return _c008_suite_error(self,exc)
+        con.close();return self.json({'ok':True,'plan':plan})
+    if path=='/api/admin/commercial-subscription':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        unknown=set(b)-_C008_SUB_FIELDS
+        if unknown:return self.json({'error':'unsupported_commercial_subscription_fields','fields':sorted(str(x) for x in unknown)},400)
+        action=clean(b.get('action') or 'grant',20).lower();con=db()
+        try:
+            if action=='grant':
+                source=clean(b.get('source') or 'complimentary',40).lower()
+                if source=='provider_verified':raise ValueError('billing_provider_confirmation_not_available')
+                sid=grant_subscription(con,int(b.get('user_id') or 0),b.get('plan_id'),source,b.get('note',''),b.get('ends_at'))
+                audit(con,s['id'],'commercial_subscription_granted','commercial_subscription',sid,{'user_id':int(b.get('user_id') or 0),'plan_id':clean(b.get('plan_id'),80),'source':source});con.commit()
+                result={'ok':True,'subscriptionId':sid}
+            elif action=='revoke':
+                sid=clean(b.get('subscription_id'),80);revoke_subscription(con,sid);audit(con,s['id'],'commercial_subscription_revoked','commercial_subscription',sid,{});con.commit();result={'ok':True}
+            else:raise ValueError('invalid_subscription_action')
+        except (ValueError,TypeError) as exc:con.rollback();con.close();return _c008_suite_error(self,exc)
+        con.close();return self.json(result)
+    if path=='/api/admin/commercial-plan-request':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        con=db()
+        try:
+            status=clean(b.get('status'),20).lower()
+            if status!='declined':raise ValueError('grant_subscription_to_approve_request')
+            resolve_plan_request(con,b.get('id'),status);audit(con,s['id'],'commercial_plan_request_resolved','commercial_plan_request',clean(b.get('id'),80),{'status':status});con.commit()
+        except ValueError as exc:con.rollback();con.close();return _c008_suite_error(self,exc)
+        con.close();return self.json({'ok':True})
+    return _c008suite_post_base(self)
+App.do_POST=_c008suite_do_POST
