@@ -1,0 +1,38 @@
+// C008 A076 premium historical evidence export/report add-on.
+function c008ExportDownload(a){
+  const blob=new Blob([a.content||''],{type:a.mimeType||'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob),link=document.createElement('a');
+  link.href=url;link.download=a.filename||`egm4000-evidence.${a.format||'txt'}`;document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+const _c008ExportTodayBase=today;
+today=async function(){
+  await _c008ExportTodayBase();
+  if(!S.me)return;
+  try{
+    const status=await api('/api/export-addon/status');
+    const grid=document.querySelector('.content .grid');if(!grid)return;
+    const ent=status.entitlement;
+    const history=status.artifacts.length?status.artifacts.map(a=>`<div class="event c008-export-artifact" data-id="${esc(a.id)}"><div class="topline"><b>${esc(a.filename)}</b><span class="pill">${esc(a.format.toUpperCase())}</span></div><p class="muted">${esc(a.rowCount)} records · SHA-256 ${esc(a.sha256.slice(0,12))}… · ${esc(a.createdAt)}</p><button class="c008-export-open">Download again</button></div>`).join(''):'<p class="muted">No premium evidence exports generated yet.</p>';
+    const controls=ent.active?`<div class="actions"><button class="aqua c008-export-generate" data-format="json">Generate JSON evidence pack</button><button class="c008-export-generate" data-format="csv">Generate CSV evidence pack</button></div>`:`<p class="muted">Premium export access is not currently provisioned for this account. This does not affect your ordinary account access or basic privacy/data rights.</p>`;
+    grid.insertAdjacentHTML('beforeend',`<div class="card span12"><div class="tag">A076 · Evidence Export Add-on</div><h2>Portable historical evidence packs</h2><p>${esc(status.historicalBoundary)}</p><p class="muted">${esc(status.paymentBoundary)}</p><div class="grid"><div class="card span5"><div class="topline"><h3>Access</h3><span class="pill ${ent.active?'good':''}">${esc(ent.status.replaceAll('_',' '))}</span></div>${ent.source?`<p class="muted">Provisioning source: ${esc(ent.source.replaceAll('_',' '))}</p>`:''}${controls}</div><div class="card span7"><h3>Your generated artifacts</h3>${history}</div></div></div>`);
+    document.querySelectorAll('.c008-export-generate').forEach(btn=>btn.onclick=async()=>{btn.disabled=true;try{const x=await post('/api/export-addon/generate',{format:btn.dataset.format});c008ExportDownload(x.artifact);await today()}catch(e){alert(e.message)}finally{btn.disabled=false}});
+    document.querySelectorAll('.c008-export-open').forEach(btn=>btn.onclick=async()=>{try{const id=btn.closest('.c008-export-artifact').dataset.id,x=await api(`/api/export-addon/artifact/${encodeURIComponent(id)}`);c008ExportDownload(x.artifact)}catch(e){alert(e.message)}});
+  }catch(e){console.warn('A076 export add-on unavailable',e)}
+};
+
+const _c008ExportAdminBase=admin;
+admin=async function(){
+  await _c008ExportAdminBase();
+  if(!S.me||S.me.role!=='owner')return;
+  try{
+    const x=await api('/api/admin/export-addon');
+    const grid=document.querySelector('.content .grid');if(!grid)return;
+    const rows=x.entitlements.length?x.entitlements.map(e=>`<div class="event"><div class="topline"><b>#${esc(e.userId)} · ${esc(e.displayName||e.username)}</b><span class="pill ${e.status==='active'?'good':''}">${esc(e.status)}</span></div><p class="muted">${esc(e.source.replaceAll('_',' '))} · ${esc(e.updatedAt)}</p>${e.note?`<p>${esc(e.note)}</p>`:''}</div>`).join(''):'<p class="muted">No A076 entitlements have been provisioned.</p>';
+    grid.insertAdjacentHTML('beforeend',`<div class="card span12" id="c008ExportAdmin"><div class="tag">C008 · A076 Export/Report Add-on</div><h2>Manual entitlement + evidence export ledger</h2><p>${esc(x.paymentBoundary)}</p><p class="muted">${esc(x.historicalBoundary)}</p><div class="grid"><div class="card span5"><label>User ID</label><input id="c008ExportUser" inputmode="numeric" placeholder="Registered user ID"><label>Provisioning source</label><select id="c008ExportSource"><option value="complimentary">complimentary</option><option value="manual_external_unverified">manual external / unverified</option></select><label>Owner note</label><textarea id="c008ExportNote" maxlength="2000" placeholder="Reason for grant/revoke; do not record payment-card data here."></textarea><div class="actions"><button id="c008ExportGrant" class="aqua">Grant access</button><button id="c008ExportRevoke">Revoke access</button></div><p class="muted">Generated artifacts across all entitled users: ${esc(x.artifactCount)}</p></div><div class="card span7"><h3>Entitlement ledger</h3>${rows}</div></div></div>`);
+    const payload=action=>({action,user_id:document.querySelector('#c008ExportUser').value,source:document.querySelector('#c008ExportSource').value,note:document.querySelector('#c008ExportNote').value});
+    document.querySelector('#c008ExportGrant').onclick=async()=>{try{await post('/api/admin/export-addon-entitlement',payload('grant'));await admin()}catch(e){alert(e.message)}};
+    document.querySelector('#c008ExportRevoke').onclick=async()=>{try{await post('/api/admin/export-addon-entitlement',payload('revoke'));await admin()}catch(e){alert(e.message)}};
+  }catch(e){console.warn('A076 export admin unavailable',e)}
+};
