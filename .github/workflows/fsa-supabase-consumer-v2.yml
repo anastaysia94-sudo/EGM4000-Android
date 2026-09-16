@@ -1,0 +1,146 @@
+name: F.S.A. → EGM4000 Supabase Consumer v2
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/20260916_egm_fsa_supabase_consumer_v2.sql"
+      - "tests/fsa-supabase-consumer-v2-smoke.sql"
+      - ".github/workflows/fsa-supabase-consumer-v2.yml"
+  push:
+    branches: [ main ]
+    paths:
+      - "supabase/migrations/20260916_egm_fsa_supabase_consumer_v2.sql"
+      - "tests/fsa-supabase-consumer-v2-smoke.sql"
+      - ".github/workflows/fsa-supabase-consumer-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: egm-fsa-consumer-v2-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: egm_bridge_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d egm_bridge_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: egm_bridge_ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Bootstrap minimal F.S.A. + EGM4000 schemas
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          create schema if not exists extensions;
+          create extension if not exists pgcrypto with schema extensions;
+          create schema if not exists egm4000;
+          do $$ begin
+            if not exists(select 1 from pg_roles where rolname='anon') then create role anon nologin; end if;
+            if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
+            if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role nologin bypassrls; end if;
+          end $$;
+
+          create table egm4000.users(
+            id bigserial primary key,
+            username text not null,
+            email text not null,
+            password_hash text not null,
+            role text not null default 'user',
+            display_name text not null,
+            bio text not null default '',
+            favorite_platform text,
+            skill_focus text,
+            status text not null default 'active',
+            is_synthetic boolean not null default false,
+            created_at timestamptz not null default now(),
+            auth_user_id uuid
+          );
+          create table egm4000.gameplay_sessions(
+            id bigserial primary key,
+            user_id bigint not null references egm4000.users(id),
+            platform text not null,
+            started_at timestamptz not null default now(),
+            ended_at timestamptz,
+            duration_min integer,
+            starting_bankroll numeric,
+            spend numeric,
+            payout numeric,
+            shots integer not null default 0,
+            hits integer not null default 0,
+            notes text not null default '',
+            source text not null default 'user'
+          );
+          create table egm4000.normalized_events(
+            id bigserial primary key,
+            live_session_id bigint,
+            user_id bigint not null references egm4000.users(id),
+            source_event_id text,
+            event_time timestamptz not null default now(),
+            platform text not null,
+            event_type text not null,
+            source text not null,
+            evidence_type text not null,
+            confidence numeric not null default 0,
+            payload jsonb not null default '{}'::jsonb,
+            created_at timestamptz not null default now()
+          );
+          create unique index idx_egm_norm_source_event
+            on egm4000.normalized_events(source_event_id)
+            where source_event_id is not null;
+
+          create table public.fsa_players(
+            id uuid primary key,
+            auth_user_id uuid
+          );
+          create table public.fsa_telemetry_sessions(
+            id uuid primary key,
+            player_id uuid not null references public.fsa_players(id),
+            client_kind text not null default 'web',
+            build text not null default 'fsa-telemetry-v1',
+            low_data boolean not null default false,
+            started_at timestamptz not null default now(),
+            last_event_at timestamptz not null default now(),
+            ended_at timestamptz,
+            event_count integer not null default 0,
+            last_game_id text,
+            last_room smallint
+          );
+          create table public.fsa_telemetry_events(
+            id bigserial primary key,
+            session_id uuid not null references public.fsa_telemetry_sessions(id),
+            player_id uuid not null references public.fsa_players(id),
+            event_type text not null,
+            game_id text,
+            room smallint,
+            payload jsonb not null default '{}'::jsonb,
+            client_nonce uuid,
+            occurred_at timestamptz not null default now(),
+            source text not null default 'client_observed'
+          );
+          SQL
+
+      - name: Apply canonical consumer migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260916_egm_fsa_supabase_consumer_v2.sql
+
+      - name: Run end-to-end bridge smoke
+        run: psql -v ON_ERROR_STOP=1 -f tests/fsa-supabase-consumer-v2-smoke.sql
