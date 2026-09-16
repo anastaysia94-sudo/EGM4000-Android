@@ -1,0 +1,12 @@
+// C008 A084 API access plan: browser-safe owner inventory. Raw keys are provisioned only in deployment shell.
+const _c008ApiAdminBase=admin;
+admin=async function(){
+  await _c008ApiAdminBase();
+  if(!S.me||S.me.role!=='owner')return;
+  try{
+    const a=await api('/api/admin/api-access');const grid=document.querySelector('.content .grid');if(!grid)return;
+    const clients=a.clients.map(c=>`<div class="event"><div class="topline"><b>${esc(c.name)}</b><span class="pill ${c.active?'good':''}">${esc(c.active?'active':'archived')}</span></div><p>${esc(c.plan)} · scopes ${esc(c.scopes.join(', '))}</p><p class="muted">Key prefix ${esc(c.keyPrefix)}… · ${esc(c.usedToday)}/${esc(c.dailyQuota)} requests today · last used ${esc(c.lastUsedAt||'never')}</p></div>`).join('')||'<p class="muted">No API clients provisioned.</p>';
+    const plans=a.plans.map(p=>`<span class="pill">${esc(p.id)} · ${esc(p.defaultDailyQuota)}/day</span>`).join(' ');
+    grid.insertAdjacentHTML('beforeend',`<div class="card span12"><div class="tag">A084 · API Access Plan</div><h2>Scoped developer API</h2><p>${plans}</p><p class="muted">${esc(a.security)}</p><p class="muted">${esc(a.provisioning)}</p><div class="event"><b>Aggregate endpoints</b><p><code>GET /api/developer/platform-summary</code> · scope <code>summary</code></p><p><code>GET /api/developer/evidence-summary</code> · scope <code>evidence</code></p><p class="muted">Clients authenticate with the X-EGM-API-Key request header. Browser administration intentionally never returns or stores raw API keys.</p></div><h3>Provisioned clients</h3>${clients}</div>`);
+  }catch(e){console.warn('A084 API access admin unavailable',e)}
+};
