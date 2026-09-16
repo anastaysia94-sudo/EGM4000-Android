@@ -1,0 +1,39 @@
+name: EGM4000 C008 API Access
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-api-access-smoke.yml"
+  pull_request:
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/c008-api-access-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  api-access:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fullstack
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install runtime dependency
+        run: pip install -r requirements.txt
+      - name: Contract, live HTTP, source assembly and syntax checks
+        env:
+          EGM_ASSEMBLE_ONLY: "1"
+        run: |
+          python -m py_compile storage.py commercial_access.py api_access_admin.py server.py test_commercial_access.py test_api_access_http.py
+          python server.py
+          node --check static/app.js
+          python test_commercial_access.py
+          EGM_ASSEMBLE_ONLY=0 python test_api_access_http.py
