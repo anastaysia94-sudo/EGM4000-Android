@@ -13,6 +13,17 @@ alter policy egm_threads_insert_self on public.egm_forum_threads
     and synthetic = false
   );
 
+-- The legacy public mirror tables are intentionally client-inaccessible. The active
+-- EGM content lives in the egm4000 schema. Make the previous implicit RLS deny
+-- explicit without granting new access.
+drop policy if exists egm_blog_posts_client_deny_all on public.egm_blog_posts;
+create policy egm_blog_posts_client_deny_all on public.egm_blog_posts
+  as restrictive for all to anon, authenticated using (false) with check (false);
+
+drop policy if exists egm_survey_feedback_client_deny_all on public.egm_survey_feedback;
+create policy egm_survey_feedback_client_deny_all on public.egm_survey_feedback
+  as restrictive for all to anon, authenticated using (false) with check (false);
+
 -- Cover foreign keys reported by the Supabase advisor.
 create index if not exists audit_events_actor_user_id_idx on egm4000.audit_events(actor_user_id);
 create index if not exists blog_comments_post_id_idx on egm4000.blog_comments(post_id);
