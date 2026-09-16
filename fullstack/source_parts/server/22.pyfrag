@@ -1,0 +1,128 @@
+
+# C008 A082 creator/coach marketplace + A083 white-label licensing.
+from marketplace_licensing import create_marketplace_order,grant_white_label,marketplace_admin,marketplace_catalog,migrate_marketplace_licensing,my_marketplace,revoke_white_label,save_listing,save_white_label_profile,update_marketplace_order,white_label_admin,white_label_preview,white_label_status
+
+_c008market=db()
+try:migrate_marketplace_licensing(_c008market)
+finally:_c008market.close()
+
+_C008_LISTING_FIELDS={'id','title','description','service_label','price_cents','platform_fee_bps','status'}
+_C008_LICENSE_FIELDS={'action','user_id','source','note'}
+_C008_PROFILE_FIELDS={'brand_name','support_label','logo_url','accent_label','footer_text'}
+
+def _c008_market_error(self,exc):
+    code=str(exc)
+    if isinstance(exc,PermissionError):status=403
+    elif code in {'marketplace_listing_not_available','marketplace_order_not_found','coach_user_not_found','license_user_not_found','white_label_license_not_found'}:status=404
+    elif code in {'active_marketplace_order_exists'}:status=409
+    else:status=400
+    return self.json({'error':code},status)
+
+_c008market_get_base=App.do_GET
+def _c008market_do_GET(self):
+    path=urlparse(self.path).path
+    if path=='/api/marketplace/catalog':
+        con=db()
+        try:payload=marketplace_catalog(con)
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/marketplace/mine':
+        s=self.need()
+        if not s:return
+        con=db()
+        try:payload=my_marketplace(con,s['id'])
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/white-label/status':
+        s=self.need()
+        if not s:return
+        con=db()
+        try:payload=white_label_status(con,s['id'])
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/white-label/preview':
+        s=self.need()
+        if not s:return
+        con=db()
+        try:payload=white_label_preview(con,s['id'])
+        except (PermissionError,ValueError) as exc:con.close();return _c008_market_error(self,exc)
+        con.close();return self.json(payload)
+    if path=='/api/admin/marketplace':
+        s=self.need(owner=True)
+        if not s:return
+        con=db()
+        try:payload=marketplace_admin(con)
+        finally:con.close()
+        return self.json(payload)
+    if path=='/api/admin/white-label':
+        s=self.need(owner=True)
+        if not s:return
+        con=db()
+        try:payload=white_label_admin(con)
+        finally:con.close()
+        return self.json(payload)
+    return _c008market_get_base(self)
+App.do_GET=_c008market_do_GET
+
+_c008market_post_base=App.do_POST
+def _c008market_do_POST(self):
+    path=urlparse(self.path).path
+    if path=='/api/marketplace/listing':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        unknown=set(b)-_C008_LISTING_FIELDS
+        if unknown:return self.json({'error':'unsupported_marketplace_listing_fields','fields':sorted(str(x) for x in unknown)},400)
+        con=db()
+        try:
+            listing=save_listing(con,s['id'],b)
+            audit(con,s['id'],'marketplace_listing_saved','coach_marketplace_listing',listing['id'],{'status':listing['status'],'price_cents':listing['priceCents'],'platform_fee_bps':listing['platformFeeBps']});con.commit()
+        except (PermissionError,ValueError,TypeError) as exc:con.rollback();con.close();return _c008_market_error(self,exc)
+        con.close();return self.json({'ok':True,'listing':listing})
+    if path=='/api/marketplace/order':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        con=db()
+        try:
+            order=create_marketplace_order(con,s['id'],b.get('listing_id'),b.get('note',''))
+            audit(con,s['id'],'marketplace_order_requested','coach_marketplace_order',order['id'],{'listing_id':order['listingId'],'platform_fee_cents':order['platformFeeCents'],'payment_status':order['paymentStatus']});con.commit()
+        except (ValueError,PermissionError) as exc:con.rollback();con.close();return _c008_market_error(self,exc)
+        con.close();return self.json({'ok':True,'order':order},201)
+    if path=='/api/marketplace/order-status':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        con=db()
+        try:
+            order=update_marketplace_order(con,s['id'],b.get('id'),b.get('status'),b.get('delivery_note',''))
+            audit(con,s['id'],'marketplace_order_updated','coach_marketplace_order',order['id'],{'status':order['status'],'payment_status':order['paymentStatus']});con.commit()
+        except (ValueError,PermissionError) as exc:con.rollback();con.close();return _c008_market_error(self,exc)
+        con.close();return self.json({'ok':True,'order':order})
+    if path=='/api/white-label/profile':
+        b=self.body();s=self.need(csrf=True)
+        if not s:return
+        unknown=set(b)-_C008_PROFILE_FIELDS
+        if unknown:return self.json({'error':'unsupported_white_label_profile_fields','fields':sorted(str(x) for x in unknown)},400)
+        con=db()
+        try:
+            state=save_white_label_profile(con,s['id'],b)
+            audit(con,s['id'],'white_label_profile_saved','white_label_profile',s['id'],{'brand_name':clean(b.get('brand_name'),180)});con.commit()
+        except (ValueError,PermissionError) as exc:con.rollback();con.close();return _c008_market_error(self,exc)
+        con.close();return self.json({'ok':True,'state':state})
+    if path=='/api/admin/white-label-license':
+        b=self.body();s=self.need(owner=True,csrf=True)
+        if not s:return
+        unknown=set(b)-_C008_LICENSE_FIELDS
+        if unknown:return self.json({'error':'unsupported_white_label_license_fields','fields':sorted(str(x) for x in unknown)},400)
+        action=clean(b.get('action') or 'grant',20).lower();uid=int(b.get('user_id') or 0);con=db()
+        try:
+            if action=='grant':
+                source=clean(b.get('source') or 'complimentary',40)
+                if source=='provider_verified':raise ValueError('billing_provider_confirmation_not_available')
+                state=grant_white_label(con,uid,source,b.get('note',''))
+                audit(con,s['id'],'white_label_license_granted','white_label_license',state['license']['id'],{'user_id':uid,'source':source});con.commit();result={'ok':True,'state':state}
+            elif action=='revoke':
+                revoke_white_label(con,uid,b.get('note',''));audit(con,s['id'],'white_label_license_revoked','white_label_license',uid,{});con.commit();result={'ok':True}
+            else:raise ValueError('invalid_white_label_license_action')
+        except (ValueError,PermissionError,TypeError) as exc:con.rollback();con.close();return _c008_market_error(self,exc)
+        con.close();return self.json(result)
+    return _c008market_post_base(self)
+App.do_POST=_c008market_do_POST
