@@ -1,6 +1,6 @@
 # F.S.A. Supabase -> EGM4000 consumer
 
-Status: live database migration applied and repository migration staged on `egm-fsa-supabase-consumer-v1`.
+Status: live database migration applied; this repository migration is the canonical source for the consumer boundary.
 
 ## Why this exists
 
