@@ -58,6 +58,8 @@ jobs:
           test -x "$BUILD_TOOLS/apksigner"
           test -x "$BUILD_TOOLS/aapt"
           "$BUILD_TOOLS/apksigner" verify --verbose android-egm4000/app/build/outputs/apk/release/app-release.apk
-          jarsigner -verify -strict android-egm4000/app/build/outputs/bundle/release/app-release.aab
+          # The CI keystore is intentionally disposable/self-signed. Verify bundle integrity,
+          # but do not require a public CA trust chain for this smoke-only identity.
+          jarsigner -verify android-egm4000/app/build/outputs/bundle/release/app-release.aab
           "$BUILD_TOOLS/aapt" dump badging android-egm4000/app/build/outputs/apk/release/app-release.apk | grep "package: name='com.smartpickshop.egm4000'"
           echo 'C015 release signing plumbing verified with a disposable CI-only key; this is not the production signing identity.'
