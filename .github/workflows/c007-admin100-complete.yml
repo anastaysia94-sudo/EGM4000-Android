@@ -1,0 +1,31 @@
+name: EGM4000 C007 Admin 100 Complete
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "fullstack/admin_registry.py"
+      - "fullstack/test_admin_registry_complete.py"
+      - ".github/workflows/c007-admin100-complete.yml"
+  pull_request:
+    paths:
+      - "fullstack/admin_registry.py"
+      - "fullstack/test_admin_registry_complete.py"
+      - ".github/workflows/c007-admin100-complete.yml"
+  workflow_dispatch:
+
+jobs:
+  admin100-complete:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fullstack
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify canonical Admin 100 ledger
+        run: |
+          python -m py_compile admin_registry.py test_admin_registry_complete.py
+          python test_admin_registry_complete.py
