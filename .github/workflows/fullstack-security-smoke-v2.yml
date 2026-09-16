@@ -1,0 +1,56 @@
+name: EGM4000 Fullstack Security Smoke v2
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/fullstack-security-smoke-v2.yml"
+  pull_request:
+    paths:
+      - "fullstack/**"
+      - ".github/workflows/fullstack-security-smoke-v2.yml"
+  workflow_dispatch:
+
+jobs:
+  fullstack-security-v2:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fullstack
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install runtime dependency
+        run: pip install -r requirements.txt
+      - name: Assemble and syntax-check complete source
+        env:
+          EGM_ASSEMBLE_ONLY: "1"
+        run: |
+          python -m py_compile *.py
+          python server.py
+          node --check static/app.js
+      - name: High-risk auth and owner security regression
+        run: |
+          python test_production_hardening.py
+          python test_security_ops_runtime.py
+      - name: Product contract regressions
+        run: |
+          python test_core_loop_integration.py
+          python test_return_features.py
+          python test_commercial_access.py
+          python test_monetization_assets.py
+          python test_custom_reports.py
+          python test_support_links.py
+          python test_export_addon.py
+          python test_priority_processing.py
+          python test_commercial_suite.py
+          python test_billing_controls.py
+          python test_marketplace_licensing.py
+          python test_billing_commerce_bridge.py
+          python test_coaching_trends.py
