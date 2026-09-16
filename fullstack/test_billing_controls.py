@@ -51,7 +51,9 @@ def main():
         grant_addon(con,2,A088,'complimentary',retain_days=30,note='QA')
         arc=create_retention_archive(con,2);assert arc['rowCount']==4 and arc['retainDays']==30
         owned=get_retention_archive(con,2,arc['id']);payload=json.loads(owned['content']);assert payload['userId']==2 and len(payload['sessions'])==2 and len(payload['tips'])==2
-        text=owned['content'].lower();assert 'password' not in text and 'auth_sessions' not in text and 'visitor' not in text
+        assert set(payload)=={'schema','userId','generatedAt','sessions','tips','boundary'}
+        assert all(set(row)<= {'id','platform','started_at','duration_min','spend','payout','shots','hits','notes','source'} for row in payload['sessions'])
+        assert all(set(row)<= {'id','session_id','created_at','title','body','evidence','confidence'} for row in payload['tips'])
         expect('retention_archive_not_found',lambda:get_retention_archive(con,3,arc['id']))
         future=(datetime.now(timezone.utc)+timedelta(days=31)).replace(microsecond=0).isoformat();assert prune_expired_archives(con,future)==1
 
