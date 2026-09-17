@@ -58,6 +58,37 @@ class LocalSessionStore(context: Context) {
         false
     }
 
+    /**
+     * Accept one exact Fish Shooter Arcade telemetry envelope, merge it into the matching
+     * durable EGM4000 session, and verify the write before reporting success.
+     */
+    @Synchronized
+    fun ingestFsaTelemetry(jsonText: String): FsaTelemetryIngestor.IngestResult {
+        val current = loadSessions()
+        val result = FsaTelemetryIngestor.ingest(current, jsonText)
+        if (!result.accepted || result.duplicate) return result
+        if (!saveSessions(result.sessions)) {
+            return result.copy(
+                sessions = current,
+                accepted = false,
+                reason = "Telemetry validated but durable local save failed"
+            )
+        }
+        val verified = loadSessions()
+        val eventStillPresent = result.eventId?.let { id ->
+            verified.asSequence().flatMap { it.events.asSequence() }.any { it.id == id }
+        } ?: false
+        return if (eventStillPresent) {
+            result.copy(sessions = verified, reason = "Exact F.S.A. telemetry accepted and persisted")
+        } else {
+            result.copy(
+                sessions = current,
+                accepted = false,
+                reason = "Telemetry save verification failed"
+            )
+        }
+    }
+
     fun clearAll(): Boolean = prefs.edit().clear().commit()
 
     fun storageStatus(): String {
