@@ -17,6 +17,12 @@ This repository is the authoritative EGM4000 Android + Web/PWA continuation repo
 - 237 clearly synthetic seed users, 948 synthetic gameplay sessions, 948 evidence-linked seed tips, and seeded community content for testing.
 - Normalized gameplay evidence, live metrics, replay, learned baselines, C006 Tips Center, and the F.S.A. exact-telemetry boundary.
 
+## Gameplay Intelligence Rebuild
+
+The primary product direction is now the gameplay-intelligence loop defined in `docs/GAMEPLAY_INTELLIGENCE_CORE_V1.md`. The branch includes a versioned 10-platform-plus-generic adapter registry at `config/game-adapters.v1.json` and the EGM-to-F.S.A. insight contract at `contracts/fsa-insight.v1.schema.json`.
+
+The intended loop is: authorized observation -> normalized evidence -> confidence-scored insight -> controlled F.S.A. experiment -> exact F.S.A. telemetry -> validation/rejection -> promotion/rollback. Existing community, surveys, tutorial, Tips, Admin100, Android/PWA, backend, replay, and evidence features remain intact.
+
 ## Android v0.2.1
 
 The native client supports the public-backend contract:
