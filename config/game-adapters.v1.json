@@ -1,0 +1,187 @@
+{
+  "schema": "egm.adapters.v1",
+  "adapters": [
+    {
+      "id": "panda-master",
+      "name": "Panda Master",
+      "capture": "user-authorized-screen",
+      "credentials": "never-collected",
+      "events": [
+        "target_seen",
+        "shot_observed",
+        "hit_observed",
+        "target_removed",
+        "weapon_change",
+        "boss_event",
+        "resource_change"
+      ],
+      "confidence": true
+    },
+    {
+      "id": "fire-kirin",
+      "name": "Fire Kirin",
+      "capture": "user-authorized-screen",
+      "credentials": "never-collected",
+      "events": [
+        "target_seen",
+        "shot_observed",
+        "hit_observed",
+        "target_removed",
+        "weapon_change",
+        "boss_event",
+        "resource_change"
+      ],
+      "confidence": true
+    },
+    {
+      "id": "juwa",
+      "name": "Juwa",
+      "capture": "user-authorized-screen",
+      "credentials": "never-collected",
+      "events": [
+        "target_seen",
+        "shot_observed",
+        "hit_observed",
+        "target_removed",
+        "weapon_change",
+        "boss_event",
+        "resource_change"
+      ],
+      "confidence": true
+    },
+    {
+      "id": "game-room",
+      "name": "Game Room",
+      "capture": "user-authorized-screen",
+      "credentials": "never-collected",
+      "events": [
+        "target_seen",
+        "shot_observed",
+        "hit_observed",
+        "target_removed",
+        "weapon_change",
+        "boss_event",
+        "resource_change"
+      ],
+      "confidence": true
+    },
+    {
+      "id": "game-master",
+      "name": "Game Master",
+      "capture": "user-authorized-screen",
+      "credentials": "never-collected",
+      "events": [
+        "target_seen",
+        "shot_observed",
+        "hit_observed",
+        "target_removed",
+        "weapon_change",
+        "boss_event",
+        "resource_change"
+      ],
+      "confidence": true
+    },
+    {
+      "id": "gamevault",
+      "name": "GameVault",
+      "capture": "user-authorized-screen",
+      "credentials": "never-collected",
+      "events": [
+        "target_seen",
+        "shot_observed",
+        "hit_observed",
+        "target_removed",
+        "weapon_change",
+        "boss_event",
+        "resource_change"
+      ],
+      "confidence": true
+    },
+    {
+      "id": "orion-stars",
+      "name": "Orion Stars",
+      "capture": "user-authorized-screen",
+      "credentials": "never-collected",
+      "events": [
+        "target_seen",
+        "shot_observed",
+        "hit_observed",
+        "target_removed",
+        "weapon_change",
+        "boss_event",
+        "resource_change"
+      ],
+      "confidence": true
+    },
+    {
+      "id": "milky-way",
+      "name": "Milky Way",
+      "capture": "user-authorized-screen",
+      "credentials": "never-collected",
+      "events": [
+        "target_seen",
+        "shot_observed",
+        "hit_observed",
+        "target_removed",
+        "weapon_change",
+        "boss_event",
+        "resource_change"
+      ],
+      "confidence": true
+    },
+    {
+      "id": "ultra-panda",
+      "name": "Ultra Panda",
+      "capture": "user-authorized-screen",
+      "credentials": "never-collected",
+      "events": [
+        "target_seen",
+        "shot_observed",
+        "hit_observed",
+        "target_removed",
+        "weapon_change",
+        "boss_event",
+        "resource_change"
+      ],
+      "confidence": true
+    },
+    {
+      "id": "vegas-sweeps",
+      "name": "Vegas Sweeps",
+      "capture": "user-authorized-screen",
+      "credentials": "never-collected",
+      "events": [
+        "target_seen",
+        "shot_observed",
+        "hit_observed",
+        "target_removed",
+        "weapon_change",
+        "boss_event",
+        "resource_change"
+      ],
+      "confidence": true
+    },
+    {
+      "id": "generic-fish-shooter",
+      "name": "Generic Fish Shooter",
+      "capture": "user-authorized-screen",
+      "credentials": "never-collected",
+      "events": [
+        "target_seen",
+        "shot_observed",
+        "hit_observed",
+        "target_removed",
+        "weapon_change",
+        "boss_event",
+        "resource_change"
+      ],
+      "confidence": true
+    }
+  ],
+  "prohibited": [
+    "autonomous_wagering",
+    "balance_manipulation",
+    "credential_capture",
+    "protection_bypass"
+  ]
+}
