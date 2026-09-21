@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EGM4000 FSA Insight",
+  "type": "object",
+  "required": [
+    "id",
+    "kind",
+    "status",
+    "title",
+    "confidence",
+    "version",
+    "proposal"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "ui",
+        "gameplay",
+        "balance",
+        "tutorial",
+        "accessibility"
+      ]
+    },
+    "status": {
+      "enum": [
+        "observed",
+        "hypothesis",
+        "experiment",
+        "validated",
+        "promoted",
+        "rejected",
+        "rolled_back"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "rationale": {
+      "type": "string"
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "applicability": {
+      "type": "object"
+    },
+    "proposal": {
+      "type": "object"
+    },
+    "experimentSpec": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "createdAt": {
+      "type": "string"
+    }
+  }
+}
