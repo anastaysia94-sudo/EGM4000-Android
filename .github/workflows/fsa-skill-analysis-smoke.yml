@@ -1,0 +1,23 @@
+name: F.S.A. skill analysis smoke
+on:
+  push:
+    paths:
+      - 'web/fsa-skill-analysis.js'
+      - 'tests/fsa-skill-analysis.test.js'
+      - 'shared/fixtures/sample-fsa-exact-telemetry-session.json'
+      - '.github/workflows/fsa-skill-analysis-smoke.yml'
+  pull_request:
+    paths:
+      - 'web/fsa-skill-analysis.js'
+      - 'tests/fsa-skill-analysis.test.js'
+      - 'shared/fixtures/sample-fsa-exact-telemetry-session.json'
+      - '.github/workflows/fsa-skill-analysis-smoke.yml'
+  workflow_dispatch:
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node tests/fsa-skill-analysis.test.js
