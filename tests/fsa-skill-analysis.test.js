@@ -24,3 +24,8 @@ const cmp=skill.compareSkillSessions(out,skill.analyzeSkillSession(later));
 assert.strictEqual(cmp.schema,'egm4000.fsa-skill-comparison.v1');
 assert.ok(cmp.caution.includes('not a prediction'));
 console.log('EGM4000 F.S.A. skill-analysis smoke test passed');
+
+const index=fs.readFileSync('web/index.html','utf8');
+assert.ok(index.includes('fsa-skill-analysis.js'));
+assert.ok(index.includes('id="analyzeFsa"'));
+assert.ok(index.includes('EGMFsaSkillAnalysis.analyzeSkillSession'));
