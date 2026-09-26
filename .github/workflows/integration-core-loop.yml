@@ -29,3 +29,5 @@ jobs:
           python -m py_compile bootstrap_db.py storage.py live_intelligence.py server.py test_core_loop_integration.py
           python server.py
           node --check static/app.js
+
+# current-main safe acceptance rerun 2026-09-25
