@@ -62,9 +62,5 @@ jobs:
             adb shell pidof com.smartpickshop.egm4000 | grep -E '[0-9]+'
             adb shell dumpsys package com.smartpickshop.egm4000 | grep 'versionName=0.3.0-production-ready'
             adb shell dumpsys activity activities | grep -m1 'com.smartpickshop.egm4000'
-            if adb logcat -d -b crash | grep -q 'com.smartpickshop.egm4000'; then
-              echo 'EGM4000 crash buffer contains an app crash' >&2
-              adb logcat -d -b crash >&2
-              exit 1
-            fi
+            if adb logcat -d -b crash | grep -q 'com.smartpickshop.egm4000'; then echo 'EGM4000 crash buffer contains an app crash' >&2; adb logcat -d -b crash >&2; exit 1; fi
             echo 'C015 emulator install/launch acceptance passed'
