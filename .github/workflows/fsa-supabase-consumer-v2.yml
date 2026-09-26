@@ -148,3 +148,5 @@ jobs:
 
       - name: Run end-to-end bridge smoke
         run: psql -v ON_ERROR_STOP=1 -f tests/fsa-supabase-consumer-v2-smoke.sql
+
+# current-main safe acceptance rerun 2026-09-25
