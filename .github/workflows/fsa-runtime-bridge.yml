@@ -1,0 +1,32 @@
+name: F.S.A. runtime bridge
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'web/fsa-skill-analysis.js'
+      - 'tests/fsa-runtime-bridge.test.js'
+      - '.github/workflows/fsa-runtime-bridge.yml'
+  pull_request:
+    paths:
+      - 'web/fsa-skill-analysis.js'
+      - 'tests/fsa-runtime-bridge.test.js'
+      - '.github/workflows/fsa-runtime-bridge.yml'
+jobs:
+  runtime-bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out EGM4000
+        uses: actions/checkout@v4
+      - name: Check out F.S.A. source
+        uses: actions/checkout@v4
+        with:
+          repository: anastaysia94-sudo/fish-shooter-arcade
+          path: fsa-source
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run F.S.A. telemetry contract
+        working-directory: fsa-source
+        run: node tests/telemetry-v1-contract.mjs
+      - name: Run live runtime bridge test
+        run: node tests/fsa-runtime-bridge.test.js
