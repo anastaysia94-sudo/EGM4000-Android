@@ -24,3 +24,5 @@ jobs:
           grep -q "egm4000.gameplay-event.v1" web/index.html
           python3 -m json.tool web/manifest.webmanifest >/dev/null
           echo "EGM4000 web/PWA smoke test passed"
+
+# current-main acceptance trigger 2026-09-25
