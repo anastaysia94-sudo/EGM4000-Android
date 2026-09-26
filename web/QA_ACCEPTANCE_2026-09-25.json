@@ -1,0 +1,21 @@
+{
+  "checked_at": "2026-09-25T22:46:53-07:00",
+  "scope": "Web/PWA and owned/synthetic telemetry acceptance only",
+  "checks": {
+    "title": true,
+    "core_loop": true,
+    "event_schema": true,
+    "manifest_json": true,
+    "service_worker": true,
+    "owned_synthetic_skill_analysis": true
+  },
+  "sample_result": {
+    "shots": 2,
+    "hits": 1,
+    "targets_destroyed": 1,
+    "hit_rate": 0.5,
+    "mean_hit_latency_ms": 200,
+    "mean_shot_gap_ms": 1000
+  },
+  "safety_boundary": "Descriptive owned/local telemetry only; no third-party real-money session was used."
+}
