@@ -1,17 +1,21 @@
 # STATUS
 
-Updated: 2026-09-25 23:10 America/Los_Angeles
+Updated: 2026-09-26 America/Los_Angeles
 
 ## Purpose
 EduGameMaster 4000 analysis/coaching product.
 
-## VERIFIED
-- Canonical repository and cross-account handoff files are present.
-- Commit `59f3f3f7c8b9c4586acdb9eb86661c58c79d7c88` documents the authorized non-monetary acceptance boundary in `SAFE-ACCEPTANCE.md`.
-- Real-money play, third-party gambling accounts, and bypassing age/identity/platform controls are explicitly outside the acceptance requirement.
+## VERIFIED SOURCE STATE
+- Current observed main head is `2af2022b53c92e0711ac8067a5489f47d9581952`.
+- `SAFE-ACCEPTANCE.md` defines the owned/authorized non-monetary acceptance boundary.
+- The repository now contains a cross-repo F.S.A. runtime telemetry bridge test and workflow.
+- The bridge source checks the F.S.A. telemetry contract and feeds synthetic exact-telemetry shot/hit/destroy events into EGM skill analysis.
+- The test asserts shots, hits, destroyed targets, hit rate, destroy rate, mean hit latency, and the non-predictive evidence limitation.
+- Real-money play, third-party gambling accounts, and bypassing age/identity/platform controls remain outside the acceptance requirement.
 
-## IN PROGRESS
-- Full current Web/PWA + Android end-to-end acceptance still needs a fresh evidence pass after the newest source/docs changes.
+## VERIFICATION PENDING
+- Current GitHub Actions result for the new F.S.A. runtime bridge workflow.
+- Fresh Web/PWA + Android end-to-end acceptance after the bridge addition.
 
 ## Current gate
-Complete the authorized non-cash sandbox acceptance loop and record executable evidence for session, telemetry, import, analysis, replay/catch-up, and data isolation.
+Verify the new runtime bridge workflow, then complete the authorized non-cash end-to-end loop and record executable evidence for session, telemetry, analysis, replay/catch-up, and data isolation.
