@@ -30,4 +30,4 @@ jobs:
           python server.py
           node --check static/app.js
 
-# current-main safe acceptance rerun 2026-09-25
+# current-main safe acceptance rerun 2026-09-27
