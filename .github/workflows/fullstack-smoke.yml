@@ -51,3 +51,5 @@ jobs:
           python test_core_loop_integration.py
           python test_return_features.py
           python test_coaching_trends.py
+
+# current-main safe acceptance rerun 2026-09-27
