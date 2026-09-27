@@ -27,3 +27,5 @@ jobs:
           node-version: '22'
       - name: Run deterministic core-loop smoke test
         run: node tests/core-loop.test.js
+
+# current-main safe acceptance rerun 2026-09-27
