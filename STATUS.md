@@ -1,21 +1,24 @@
 # STATUS
 
-Updated: 2026-09-26 America/Los_Angeles
+Updated: 2026-09-28 America/Los_Angeles
 
 ## Purpose
 EduGameMaster 4000 analysis/coaching product.
 
-## VERIFIED SOURCE STATE
-- Current observed main head is `2af2022b53c92e0711ac8067a5489f47d9581952`.
-- `SAFE-ACCEPTANCE.md` defines the owned/authorized non-monetary acceptance boundary.
-- The repository now contains a cross-repo F.S.A. runtime telemetry bridge test and workflow.
-- The bridge source checks the F.S.A. telemetry contract and feeds synthetic exact-telemetry shot/hit/destroy events into EGM skill analysis.
-- The test asserts shots, hits, destroyed targets, hit rate, destroy rate, mean hit latency, and the non-predictive evidence limitation.
-- Real-money play, third-party gambling accounts, and bypassing age/identity/platform controls remain outside the acceptance requirement.
+## VERIFIED CURRENT SOURCE
+- Current observed main head: `8976a7f8f123d8cd8582530ca812c34b5d695285`.
+- Fullstack smoke run `36316702028` completed successfully at that exact head.
+- The owned F.S.A. exact-telemetry bridge, Web/PWA smoke, skill-analysis, core-loop and integration lanes were also green in the current acceptance sequence.
+- `fullstack/admin_registry.py` currently defines exactly 100 Admin capabilities, all with `implementation_status=implemented`.
+- `fullstack/test_admin_registry_complete.py` asserts 100 implemented / 0 modelled / 0 provider-config-required and requires a non-empty evidence entry for every A001-A100 capability.
+- Provider-backed commercial features remain fail-closed when no external provider is configured. That runtime configuration requirement is not represented as missing application implementation.
+- Synthetic users/sessions remain fixtures only and are never customer, revenue or third-party evidence.
 
-## VERIFICATION PENDING
-- Current GitHub Actions result for the new F.S.A. runtime bridge workflow.
-- Fresh Web/PWA + Android end-to-end acceptance after the bridge addition.
+## OPEN PRODUCTION GATES
+- Canonical public deployment/URL acceptance remains separate from source/CI acceptance.
+- Production auth/environment configuration must be verified on the actual deployed service.
+- Android/public-device distribution acceptance remains separate.
+- Real commercial validation and received revenue remain separate and cannot be inferred from synthetic fixtures or implemented monetization controls.
 
-## Current gate
-Verify the new runtime bridge workflow, then complete the authorized non-cash end-to-end loop and record executable evidence for session, telemetry, analysis, replay/catch-up, and data isolation.
+## CURRENT GATE
+Do not rebuild Admin 100. Preserve the verified registry and move to public production topology/auth/device acceptance, then commercial validation using real users only.
