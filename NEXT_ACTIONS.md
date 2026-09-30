@@ -1,14 +1,14 @@
 # NEXT ACTIONS
 
-Updated: 2026-09-28 America/Los_Angeles
+Updated: 2026-09-30 America/Los_Angeles
 
 ## Smallest next execution block
-1. Treat Admin A001-A100 implementation as current source-complete; do not revert to the historical 75/25 or 80/20 registry snapshots.
-2. Resolve the canonical public deployment target and exact served source revision.
-3. Verify production readiness/authentication/environment configuration against that live target.
-4. Run supported-device/public browser acceptance against the deployed product.
-5. Record deployment ID/URL, exact source SHA, health/readiness evidence, auth/session evidence and device/browser evidence.
-6. Keep synthetic fixtures separate from real users, customers and revenue.
+1. Treat Admin A001-A100, the owned F.S.A. runtime bridge, skill analysis, Web/PWA, core loop, integration and fullstack lanes as source/CI verified.
+2. Resolve the canonical public EGM4000 deployment target and exact served source revision.
+3. Verify production health/readiness/authentication/environment configuration against that live target.
+4. Run public browser and supported-device acceptance.
+5. Capture the first real linked F.S.A. production telemetry session separately from synthetic/owned fixture acceptance.
+6. Record URL, deployment ID, exact source SHA, health/readiness, auth/session, device/browser, and telemetry evidence.
 7. Only after production acceptance, begin real-user commercial validation and reconcile actual received payments if any.
 
 ## Safety boundary
