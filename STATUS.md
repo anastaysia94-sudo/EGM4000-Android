@@ -1,24 +1,32 @@
 # STATUS
 
-Updated: 2026-09-28 America/Los_Angeles
+Updated: 2026-09-30 America/Los_Angeles
 
 ## Purpose
 EduGameMaster 4000 analysis/coaching product.
 
 ## VERIFIED CURRENT SOURCE
-- Current observed main head: `8976a7f8f123d8cd8582530ca812c34b5d695285`.
-- Fullstack smoke run `36316702028` completed successfully at that exact head.
-- The owned F.S.A. exact-telemetry bridge, Web/PWA smoke, skill-analysis, core-loop and integration lanes were also green in the current acceptance sequence.
-- `fullstack/admin_registry.py` currently defines exactly 100 Admin capabilities, all with `implementation_status=implemented`.
-- `fullstack/test_admin_registry_complete.py` asserts 100 implemented / 0 modelled / 0 provider-config-required and requires a non-empty evidence entry for every A001-A100 capability.
-- Provider-backed commercial features remain fail-closed when no external provider is configured. That runtime configuration requirement is not represented as missing application implementation.
-- Synthetic users/sessions remain fixtures only and are never customer, revenue or third-party evidence.
+- Current observed main before this status reconciliation: `2616669566886b1609380958757e5ec9d886b352`.
+- The implementation-tested acceptance head remains `8976a7f8f123d8cd8582530ca812c34b5d695285`; the three commits after it change only `STATUS.md`, `NEXT_ACTIONS.md`, and `docs/FEATURE_REGISTRY_SUMMARY.md`.
+- Fullstack smoke run `36316702028`: SUCCESS.
+- Core-loop integration run `36316700181`: SUCCESS.
+- Core-loop smoke run `36316698256`: SUCCESS.
+- F.S.A. skill-analysis run `36316637595`: SUCCESS.
+- Web/PWA smoke run `36316624417`: SUCCESS.
+- F.S.A. runtime bridge run `36229041047`: SUCCESS.
+- F.S.A. → EGM4000 Supabase consumer v2 run `36222605333`: SUCCESS.
+- Android emulator acceptance run `36218729880`: SUCCESS.
+- Admin A001-A100 is source-complete in the current registry; do not revert to historical 75/25 or 80/20 snapshots.
+- Provider-backed commercial features remain fail-closed until external provider configuration is actually present.
+- Synthetic users/sessions remain fixtures only and are never customer, revenue, or third-party evidence.
 
 ## OPEN PRODUCTION GATES
-- Canonical public deployment/URL acceptance remains separate from source/CI acceptance.
-- Production auth/environment configuration must be verified on the actual deployed service.
-- Android/public-device distribution acceptance remains separate.
-- Real commercial validation and received revenue remain separate and cannot be inferred from synthetic fixtures or implemented monetization controls.
+- Canonical public deployment URL + exact served-source acceptance.
+- Production auth/environment acceptance on that deployed service.
+- Public browser/supported-device acceptance.
+- Android/public-device distribution acceptance.
+- First real linked F.S.A. production telemetry session remains a separate evidence gate.
+- Real commercial validation and received revenue remain separate.
 
-## CURRENT GATE
-Do not rebuild Admin 100. Preserve the verified registry and move to public production topology/auth/device acceptance, then commercial validation using real users only.
+## Current gate
+Preserve the green owned/synthetic non-cash analysis/bridge evidence. Move to public production topology/auth/device acceptance; do not require third-party gambling credentials, real-money play, age/identity bypass, or profit guarantees.
