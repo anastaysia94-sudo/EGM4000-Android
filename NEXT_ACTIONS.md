@@ -13,3 +13,8 @@ Updated: 2026-09-30 America/Los_Angeles
 
 ## Safety boundary
 Use owned F.S.A. exact telemetry or explicitly authorized synthetic/non-cash environments. Do not require third-party gambling credentials, real-money play, platform bypasses, or profit guarantees.
+
+## 2026-10-04 PT — repo maintenance notes (The Albino · Pit Keeper)
+1. Review/merge licence PR #9.
+2. Decide whether the GitHub Pages URL should be listed as a public EGM4000 surface (it is live but is not the canonical production target).
+3. Production gates listed above are unchanged.

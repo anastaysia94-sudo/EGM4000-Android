@@ -30,3 +30,9 @@ EduGameMaster 4000 analysis/coaching product.
 
 ## Current gate
 Preserve the green owned/synthetic non-cash analysis/bridge evidence. Move to public production topology/auth/device acceptance; do not require third-party gambling credentials, real-money play, age/identity bypass, or profit guarantees.
+
+## 2026-10-04 PT — repo maintenance notes (The Albino · Pit Keeper)
+- GitHub Pages: enabled 2026-10-04 (source: GitHub Actions). `deploy-web-pwa-pages.yml` run `37197376553`: SUCCESS. Live: https://anastaysia94-sudo.github.io/EGM4000-Android/ (HTTP 200; index, manifest, sw.js, icon.svg all 200). The Sep 6–13 deploy failures (`Create Pages site failed: Resource not accessible by integration`) were caused only by Pages being off.
+- This is a public web/PWA surface; it does not by itself satisfy the canonical production deployment / auth / device gates above.
+- Licence: an all-rights-reserved SmartPickShop Holdings `LICENSE` notice is proposed in PR https://github.com/anastaysia94-sudo/EGM4000-Android/pull/9 (OPEN, not merged). Until it merges the repo still has no licence file.
+- Nothing in this note is merged; PRs await Anastaysia's review. No secrets were read or changed.
